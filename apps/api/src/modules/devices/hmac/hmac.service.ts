@@ -35,7 +35,15 @@ export class HmacService {
     }
 
     const expected = this.sign(payload, timestamp);
-    return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
+    const expectedBuf = Buffer.from(expected, 'hex');
+    const signatureBuf = Buffer.from(signature, 'hex');
+
+    // timingSafeEqual requires equal-length buffers; reject early on length mismatch
+    if (expectedBuf.length !== signatureBuf.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expectedBuf, signatureBuf);
   }
 
   private normalizePayload(payload: Record<string, unknown>): string {
