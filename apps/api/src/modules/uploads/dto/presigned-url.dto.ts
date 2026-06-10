@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class PresignedUrlDto {
   @ApiProperty({ description: '文件名（含扩展名）', example: 'recording-001.mp3' })
   @IsString()
-  @Matches(/^[\w,\-\.]+$/)
+  @Matches(/^[\w\-,.]+$/)
   fileName!: string;
 
   @ApiProperty({
