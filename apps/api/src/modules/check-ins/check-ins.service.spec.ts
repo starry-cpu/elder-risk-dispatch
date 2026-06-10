@@ -56,6 +56,20 @@ describe('CheckInsService', () => {
       expect(result.status).toBe('NORMAL');
     });
 
+    it('should allow ADMIN to create ONE_TAP check-in for any elder', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.create.mockResolvedValue({
+        id: 'ci-admin', elderId: 'elder-1', method: 'ONE_TAP',
+        content: null, voiceUrl: null, status: 'NORMAL', createdAt: new Date(),
+      });
+
+      const result = await service.create(
+        { elderId: 'elder-1', method: CheckInMethod.ONE_TAP },
+        admin,
+      );
+      expect(result.method).toBe('ONE_TAP');
+    });
+
     it('should create VOICE check-in with voiceUrl', async () => {
       mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
       mockPrisma.checkIn.create.mockResolvedValue({
@@ -152,6 +166,16 @@ describe('CheckInsService', () => {
       const result = await service.findByElder('elder-1', { page: 1, limit: 20 }, worker);
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
+    });
+
+    it('should allow ADMIN to query any elder check-ins', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.findMany.mockResolvedValue([]);
+      mockPrisma.checkIn.count.mockResolvedValue(0);
+
+      const result = await service.findByElder('elder-1', { page: 1, limit: 20 }, admin);
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
     });
 
     it('should reject cross-district access', async () => {
