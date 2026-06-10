@@ -1,36 +1,269 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { FieldEncryptionService } from '../../common/crypto/field-encryption.service';
+import { Role, ServiceLevel, RiskLevel } from '@prisma/client';
+
+interface Requester {
+  sub: string;
+  role: Role;
+  district?: string;
+}
+
+const ENCRYPT_FIELDS = ['idCard', 'address'];
 
 @Injectable()
 export class EldersService {
-  async create(dto: any, requester: any): Promise<any> {
-    throw new Error('Not implemented');
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly crypto: FieldEncryptionService,
+  ) {}
+
+  async create(dto: any, requester: Requester) {
+    const { contacts, ...elderData } = dto;
+    const encryptedData: any = { ...elderData };
+    for (const field of ENCRYPT_FIELDS) {
+      if (encryptedData[field]) {
+        encryptedData[field] = this.crypto.encrypt(String(encryptedData[field]));
+      }
+    }
+    if (encryptedData.birthDate) {
+      encryptedData.birthDate = new Date(encryptedData.birthDate);
+    }
+
+    const elder = await this.prisma.elder.create({
+      data: {
+        ...encryptedData,
+        contacts: contacts
+          ? {
+              create: contacts.map((c: any) => ({
+                name: c.name,
+                relation: c.relation,
+                phone: this.crypto.encrypt(c.phone),
+                isPrimary: c.isPrimary ?? false,
+              })),
+            }
+          : undefined,
+      },
+      include: { contacts: true },
+    });
+    return this.sanitizeElder(elder, requester);
   }
 
-  async findAll(query: any): Promise<any> {
-    throw new Error('Not implemented');
+  async findAll(query: {
+    page?: number;
+    limit?: number;
+    district?: string;
+    serviceLevel?: ServiceLevel;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (query.district) where.district = query.district;
+    if (query.serviceLevel) where.serviceLevel = query.serviceLevel;
+    const [items, total] = await Promise.all([
+      this.prisma.elder.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { contacts: true },
+      }),
+      this.prisma.elder.count({ where }),
+    ]);
+    return {
+      items: items.map((e) => this.maskSensitive(e)),
+      total,
+      page,
+      limit,
+    };
   }
 
-  async findById(id: string, requester: any): Promise<any> {
-    throw new Error('Not implemented');
+  async findById(id: string, requester: Requester) {
+    const elder = await this.prisma.elder.findUnique({
+      where: { id },
+      include: { contacts: true, familyLinks: true },
+    });
+    if (!elder) throw new BadRequestException('老人不存在');
+    if (requester.role !== Role.ADMIN) {
+      if (requester.role === Role.FAMILY) {
+        const isLinked = elder.familyLinks.some(
+          (fl: any) => fl.userId === requester.sub,
+        );
+        if (!isLinked)
+          throw new ForbiddenException('无权限查看此老人信息');
+      } else if (
+        requester.district &&
+        elder.district !== requester.district
+      ) {
+        throw new ForbiddenException('无权限查看其他片区的老人信息');
+      }
+    }
+    return this.sanitizeElder(elder, requester);
   }
 
-  async update(id: string, dto: any): Promise<any> {
-    throw new Error('Not implemented');
+  async update(id: string, dto: any) {
+    const encryptedData: any = { ...dto };
+    for (const field of ENCRYPT_FIELDS) {
+      if (encryptedData[field]) {
+        encryptedData[field] = this.crypto.encrypt(String(encryptedData[field]));
+      }
+    }
+    if (encryptedData.birthDate) {
+      encryptedData.birthDate = new Date(encryptedData.birthDate);
+    }
+    const elder = await this.prisma.elder.update({
+      where: { id },
+      data: encryptedData,
+      include: { contacts: true },
+    });
+    return this.maskSensitive(elder);
   }
 
-  async addContact(elderId: string, dto: any): Promise<any> {
-    throw new Error('Not implemented');
+  async addContact(elderId: string, dto: {
+    name: string;
+    relation: string;
+    phone: string;
+    isPrimary?: boolean;
+  }) {
+    const contact = await this.prisma.emergencyContact.create({
+      data: {
+        elderId,
+        name: dto.name,
+        relation: dto.relation,
+        phone: this.crypto.encrypt(dto.phone),
+        isPrimary: dto.isPrimary ?? false,
+      },
+    });
+    return { ...contact, phone: this.crypto.decrypt(contact.phone) };
   }
 
-  async getContacts(elderId: string): Promise<any> {
-    throw new Error('Not implemented');
+  async getContacts(elderId: string) {
+    const contacts = await this.prisma.emergencyContact.findMany({
+      where: { elderId },
+    });
+    return contacts.map((c) => ({ ...c, phone: this.tryDecrypt(c.phone) }));
   }
 
-  async getRiskProfile(elderId: string): Promise<any> {
-    throw new Error('Not implemented');
+  async getRiskProfile(elderId: string) {
+    const elder = await this.prisma.elder.findUnique({
+      where: { id: elderId },
+      select: { id: true, name: true, serviceLevel: true },
+    });
+    if (!elder) throw new BadRequestException('老人不存在');
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const [
+      totalCheckIns,
+      missedCheckIns,
+      abnormalCheckIns,
+      totalVisits,
+      activeRiskEvents,
+      completedWorkOrders,
+      latestRiskEvent,
+      recentRiskEvents,
+    ] = await Promise.all([
+      this.prisma.checkIn.count({
+        where: { elderId, createdAt: { gte: thirtyDaysAgo } },
+      }),
+      this.prisma.checkIn.count({
+        where: { elderId, status: 'MISSED', createdAt: { gte: thirtyDaysAgo } },
+      }),
+      this.prisma.checkIn.count({
+        where: { elderId, status: 'ABNORMAL', createdAt: { gte: thirtyDaysAgo } },
+      }),
+      this.prisma.visitRecord.count({
+        where: { elderId, visitTime: { gte: thirtyDaysAgo } },
+      }),
+      this.prisma.riskEvent.count({
+        where: { elderId, status: { in: ['PENDING_REVIEW', 'CONFIRMED'] } },
+      }),
+      this.prisma.workOrder.count({
+        where: { elderId, status: 'COMPLETED' },
+      }),
+      this.prisma.riskEvent.findFirst({
+        where: { elderId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.riskEvent.findMany({
+        where: { elderId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+    return {
+      elderId: elder.id,
+      elderName: elder.name,
+      serviceLevel: elder.serviceLevel,
+      stats: {
+        totalCheckIns,
+        missedCheckIns,
+        abnormalCheckIns,
+        totalVisits,
+        activeRiskEvents,
+        completedWorkOrders,
+      },
+      currentRisk: {
+        latestRiskEvent,
+        level: latestRiskEvent?.level ?? RiskLevel.LOW,
+        activeAlerts: activeRiskEvents,
+      },
+      recentRiskEvents,
+      generatedAt: new Date().toISOString(),
+    };
   }
 
-  async linkFamily(elderId: string, userId: string, relation: string): Promise<any> {
-    throw new Error('Not implemented');
+  async linkFamily(elderId: string, userId: string, relation: string) {
+    return this.prisma.elderFamilyLink.create({
+      data: { elderId, userId, relation },
+    });
+  }
+
+  private sanitizeElder(elder: any, requester: Requester) {
+    const isAdmin = requester.role === Role.ADMIN;
+    const isFamily = requester.role === Role.FAMILY;
+    const isSameDistrict =
+      requester.district && elder.district === requester.district;
+    const canSeeSensitive = isAdmin || isSameDistrict || isFamily;
+    return {
+      id: elder.id,
+      name: elder.name,
+      gender: elder.gender,
+      birthDate: elder.birthDate,
+      idCard: isAdmin ? this.tryDecrypt(elder.idCard) : null,
+      address: canSeeSensitive ? this.tryDecrypt(elder.address) : null,
+      district: elder.district,
+      longitude: elder.longitude,
+      latitude: elder.latitude,
+      healthTags: elder.healthTags,
+      serviceLevel: elder.serviceLevel,
+      livingStatus: elder.livingStatus,
+      createdAt: elder.createdAt,
+      contacts: elder.contacts?.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        relation: c.relation,
+        phone: canSeeSensitive ? this.tryDecrypt(c.phone) : null,
+        isPrimary: c.isPrimary,
+      })),
+    };
+  }
+
+  private maskSensitive(elder: any) {
+    return {
+      ...elder,
+      idCard: null,
+      address: null,
+      contacts: elder.contacts?.map((c: any) => ({ ...c, phone: null })),
+    };
+  }
+
+  private tryDecrypt(value: string | null): string | null {
+    if (!value) return null;
+    try {
+      return this.crypto.decrypt(value);
+    } catch {
+      return value;
+    }
   }
 }
