@@ -16,6 +16,7 @@ export default async function globalSetup() {
 
   const url = pgContainer.getConnectionUri();
   process.env.DATABASE_URL = url;
+  process.env.DEVICE_HMAC_SECRET = 'e2e-test-hmac-secret';
   globalThis.__PG_CONTAINER__ = pgContainer;
 
   const apiDir = path.join(__dirname, '..');

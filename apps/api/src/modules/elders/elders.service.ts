@@ -177,6 +177,12 @@ export class EldersService {
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const todayStart = new Date(todayStr);
+
     const [
       totalCheckIns,
       missedCheckIns,
@@ -186,6 +192,11 @@ export class EldersService {
       completedWorkOrders,
       latestRiskEvent,
       recentRiskEvents,
+      // ✨ 新增
+      recentCheckIns,
+      recentVisits,
+      recentDeviceAlarms,
+      todayCheckIns,
     ] = await Promise.all([
       this.prisma.checkIn.count({
         where: { elderId, createdAt: { gte: thirtyDaysAgo } },
@@ -214,7 +225,50 @@ export class EldersService {
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
+      // ✨ Recent 7-day check-ins
+      this.prisma.checkIn.findMany({
+        where: { elderId, createdAt: { gte: sevenDaysAgo } },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      }),
+      // ✨ Recent 30-day visits
+      this.prisma.visitRecord.findMany({
+        where: { elderId, visitTime: { gte: thirtyDaysAgo } },
+        orderBy: { visitTime: 'desc' },
+        take: 20,
+      }),
+      // ✨ Recent device alarms
+      this.prisma.deviceData.findMany({
+        where: { elderId, alarm: true },
+        orderBy: { timestamp: 'desc' },
+        take: 20,
+      }),
+      // ✨ Today's check-ins
+      this.prisma.checkIn.count({
+        where: { elderId, createdAt: { gte: todayStart } },
+      }),
     ]);
+
+    // Calculate check-in streak: count consecutive calendar days with at least one check-in,
+    // starting from yesterday (today might not have a check-in yet)
+    const daySet = new Set<string>();
+    for (const d of recentCheckIns) {
+      const dateStr = new Date(d.createdAt).toISOString().split('T')[0];
+      daySet.add(dateStr);
+    }
+    let checkInStreak = 0;
+    let checkDay = new Date();
+    checkDay.setDate(checkDay.getDate() - 1); // start from yesterday
+    while (true) {
+      const dayKey = checkDay.toISOString().split('T')[0];
+      if (daySet.has(dayKey)) {
+        checkInStreak++;
+        checkDay.setDate(checkDay.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
     return {
       elderId: elder.id,
       elderName: elder.name,
@@ -233,6 +287,15 @@ export class EldersService {
         activeAlerts: activeRiskEvents,
       },
       recentRiskEvents,
+      // ✨ 新增
+      recentCheckIns,
+      recentVisits,
+      recentDeviceAlarms,
+      summary: {
+        checkInStreak,
+        missedToday: todayCheckIns === 0,
+        activeAlarms: recentDeviceAlarms.length,
+      },
       generatedAt: new Date().toISOString(),
     };
   }

@@ -10,8 +10,12 @@ const config: Config = {
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
+  transformIgnorePatterns: [
+    'node_modules/(?!.*@aws-sdk)',
+  ],
   moduleNameMapper: {
     '^@src/(.*)$': '<rootDir>/$1',
+    '^uuid$': '<rootDir>/__mocks__/uuid',
   },
 };
 

@@ -35,9 +35,14 @@ describe('EldersService', () => {
     },
     checkIn: {
       count: jest.fn(),
+      findMany: jest.fn(),
+    },
+    deviceData: {
+      findMany: jest.fn(),
     },
     visitRecord: {
       count: jest.fn(),
+      findMany: jest.fn(),
     },
     riskEvent: {
       findFirst: jest.fn(),
@@ -201,7 +206,10 @@ describe('EldersService', () => {
         district: '朝阳区', familyLinks: [],
       });
       mockPrisma.checkIn.count.mockResolvedValue(25);
+      mockPrisma.checkIn.findMany.mockResolvedValue([]);
       mockPrisma.visitRecord.count.mockResolvedValue(8);
+      mockPrisma.visitRecord.findMany.mockResolvedValue([]);
+      mockPrisma.deviceData.findMany.mockResolvedValue([]);
       mockPrisma.riskEvent.findFirst.mockResolvedValue(null);
       mockPrisma.riskEvent.findMany.mockResolvedValue([]);
       mockPrisma.riskEvent.count.mockResolvedValue(0);
@@ -213,6 +221,41 @@ describe('EldersService', () => {
       expect(result.stats.completedWorkOrders).toBe(3);
       expect(result).toHaveProperty('currentRisk');
       expect(result).toHaveProperty('recentRiskEvents');
+    });
+
+    it('should include recent check-ins, visits and device alarms with summary', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue({
+        id: 'elder-1', name: '张大爷', serviceLevel: 'KEY',
+        district: '朝阳区', familyLinks: [],
+      });
+      mockPrisma.checkIn.count.mockResolvedValue(25);
+      mockPrisma.checkIn.findMany.mockResolvedValue([
+        { id: 'ci-1', method: 'ONE_TAP', status: 'NORMAL', createdAt: new Date() },
+      ]);
+      mockPrisma.visitRecord.count.mockResolvedValue(8);
+      mockPrisma.visitRecord.findMany.mockResolvedValue([
+        { id: 'v-1', observation: '正常', visitTime: new Date() },
+      ]);
+      mockPrisma.deviceData.findMany.mockResolvedValue([
+        { id: 'dd-1', deviceType: 'FALL_DETECTOR', metricType: 'FALL', alarm: true, timestamp: new Date() },
+      ]);
+      mockPrisma.riskEvent.findFirst.mockResolvedValue(null);
+      mockPrisma.riskEvent.findMany.mockResolvedValue([]);
+      mockPrisma.riskEvent.count.mockResolvedValue(0);
+      mockPrisma.workOrder.count.mockResolvedValue(3);
+
+      const result = await service.getRiskProfile('elder-1', admin);
+
+      expect(result).toHaveProperty('recentCheckIns');
+      expect(result.recentCheckIns).toHaveLength(1);
+      expect(result).toHaveProperty('recentVisits');
+      expect(result.recentVisits).toHaveLength(1);
+      expect(result).toHaveProperty('recentDeviceAlarms');
+      expect(result.recentDeviceAlarms).toHaveLength(1);
+      expect(result).toHaveProperty('summary');
+      expect(result.summary).toHaveProperty('checkInStreak');
+      expect(result.summary).toHaveProperty('missedToday');
+      expect(result.summary).toHaveProperty('activeAlarms');
     });
   });
 
