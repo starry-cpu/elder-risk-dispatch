@@ -47,7 +47,7 @@ describe('AuthController', () => {
 
   describe('GET /auth/me', () => {
     it('should return current user info', async () => {
-      const user = { sub: '1', role: Role.ADMIN, district: '朝阳区', loginType: 'admin' };
+      const user = { sub: '1', role: Role.ADMIN, district: '朝阳区', loginType: 'admin' as const };
       const result = await controller.getMe(user);
       expect(result).toEqual(user);
     });
