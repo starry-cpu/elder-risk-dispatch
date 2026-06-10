@@ -122,6 +122,15 @@ jobs:
       - name: Generate Prisma client
         working-directory: apps/api
         run: pnpm prisma:generate
+      - name: Pre-pull Postgres image (with retry)
+        run: |
+          for i in 1 2 3; do
+            echo "Attempt $i: pulling postgres:16-alpine..."
+            docker pull postgres:16-alpine && break
+            echo "Pull failed, waiting 10s..."
+            sleep 10
+          done
+          docker image ls postgres:16-alpine
       - name: Run E2E tests
         working-directory: apps/api
         run: pnpm test:e2e
