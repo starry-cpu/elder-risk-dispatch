@@ -40,4 +40,31 @@ describe('UploadsService', () => {
       expect(service.validateContentType('', ['audio/mp3'])).toBe(false);
     });
   });
+
+  describe('getAllowedTypesForFolder', () => {
+    it('should return audio types for checkins folder', () => {
+      const types = service.getAllowedTypesForFolder('checkins');
+      expect(types).toHaveLength(3);
+      expect(types).toContain('audio/mp3');
+      expect(types).toContain('audio/wav');
+      expect(types).toContain('audio/m4a');
+    });
+
+    it('should return image types for visits folder', () => {
+      const types = service.getAllowedTypesForFolder('visits');
+      expect(types).toHaveLength(4);
+      expect(types).toContain('image/jpeg');
+      expect(types).toContain('image/png');
+    });
+
+    it('should return empty array for unknown folder', () => {
+      const types = service.getAllowedTypesForFolder('nonexistent');
+      expect(types).toEqual([]);
+    });
+
+    it('should return empty array for empty string folder', () => {
+      const types = service.getAllowedTypesForFolder('');
+      expect(types).toEqual([]);
+    });
+  });
 });
