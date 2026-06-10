@@ -96,10 +96,19 @@ jobs:
         env:
           DATABASE_URL: postgresql://app:app@localhost:5432/care
           REDIS_URL: redis://localhost:6379
+          FIELD_ENCRYPTION_KEY: MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
+          JWT_SECRET: ci-test-jwt-secret-not-for-production
 
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    env:
+      # AES-256-GCM 32-byte key (base64-encoded)
+      FIELD_ENCRYPTION_KEY: MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=
+      # JWT signing secret (CI only)
+      JWT_SECRET: ci-test-jwt-secret-not-for-production
+      # Testcontainers needs Docker socket path
+      DOCKER_HOST: unix:///var/run/docker.sock
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -114,4 +123,5 @@ jobs:
         working-directory: apps/api
         run: pnpm prisma:generate
       - name: Run E2E tests
+        working-directory: apps/api
         run: pnpm test:e2e
