@@ -164,6 +164,8 @@ model VisitRecord {
   observation  String
   photos       String[] @default([])
   note         String?
+  longitude    Float?
+  latitude     Float?
   elder        Elder    @relation(fields: [elderId], references: [id], onDelete: Cascade)
   gridWorker   User     @relation(fields: [gridWorkerId], references: [id])
 }
@@ -171,6 +173,7 @@ model VisitRecord {
 model DeviceData {
   id         String   @id @default(cuid())
   elderId    String
+  deviceId   String
   deviceType String
   metricType String
   value      String?

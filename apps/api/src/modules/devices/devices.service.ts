@@ -12,6 +12,20 @@ interface Requester {
 export class DevicesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private authorizeAccess(elder: any, requester: Requester) {
+    if (requester.role === Role.ADMIN) return;
+    if (requester.role === Role.FAMILY) {
+      const isLinked = elder.familyLinks?.some(
+        (fl: any) => fl.userId === requester.sub,
+      );
+      if (!isLinked) throw new ForbiddenException('无权限查看此老人的设备数据');
+      return;
+    }
+    if (requester.district && elder.district !== requester.district) {
+      throw new ForbiddenException('无权限查看其他片区的设备数据');
+    }
+  }
+
   async ingest(dto: {
     deviceId: string;
     elderId: string;
@@ -29,6 +43,7 @@ export class DevicesService {
     return this.prisma.deviceData.create({
       data: {
         elderId: dto.elderId,
+        deviceId: dto.deviceId,
         deviceType: dto.deviceType,
         metricType: dto.metricType,
         value: dto.value || null,
@@ -44,12 +59,7 @@ export class DevicesService {
       include: { familyLinks: true },
     });
     if (!elder) throw new NotFoundException('老人不存在');
-
-    if (requester.role !== Role.ADMIN) {
-      if (requester.district && elder.district !== requester.district) {
-        throw new ForbiddenException('无权限查看其他片区的设备数据');
-      }
-    }
+    this.authorizeAccess(elder, requester);
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;

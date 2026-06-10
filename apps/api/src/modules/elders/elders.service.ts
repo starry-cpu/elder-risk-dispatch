@@ -179,8 +179,9 @@ export class EldersService {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const todayStart = new Date(todayStr);
 
     const [
       totalCheckIns,
@@ -287,8 +288,8 @@ export class EldersService {
       },
       recentRiskEvents,
       // ✨ 新增
-      recentCheckIns: recentCheckIns.slice(0, 7),
-      recentVisits: recentVisits.slice(0, 5),
+      recentCheckIns,
+      recentVisits,
       recentDeviceAlarms,
       summary: {
         checkInStreak,

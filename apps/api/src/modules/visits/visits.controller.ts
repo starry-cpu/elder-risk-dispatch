@@ -21,6 +21,7 @@ export class VisitsController {
   }
 
   @Get()
+  @Roles(Role.GRID_WORKER, Role.ADMIN)
   @ApiOperation({ summary: '查询巡访记录（按老人/时间范围筛选）' })
   findAll(@Query() query: QueryVisitDto, @CurrentUser() user: any) {
     const { page = 1, limit = 20, ...rest } = query;

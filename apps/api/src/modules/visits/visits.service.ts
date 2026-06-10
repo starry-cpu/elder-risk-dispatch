@@ -51,6 +51,8 @@ export class VisitsService {
         observation: dto.observation,
         photos: dto.photos || [],
         note: dto.note || null,
+        longitude: dto.longitude ?? null,
+        latitude: dto.latitude ?? null,
         visitTime: dto.visitTime ? new Date(dto.visitTime) : new Date(),
       },
     });
