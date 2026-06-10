@@ -38,7 +38,7 @@ export class DevicesService {
     });
   }
 
-  async findByElder(elderId: string, query: { page: number; limit: number }, requester: Requester) {
+  async findByElder(elderId: string, query: { page?: number; limit?: number }, requester: Requester) {
     const elder = await this.prisma.elder.findUnique({
       where: { id: elderId },
       include: { familyLinks: true },
