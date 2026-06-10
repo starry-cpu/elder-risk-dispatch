@@ -91,7 +91,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://app:app@localhost:5432/care
       - name: Run tests
-        run: pnpm -r test --coverage
+        working-directory: apps/api
+        run: pnpm test:cov
         env:
           DATABASE_URL: postgresql://app:app@localhost:5432/care
           REDIS_URL: redis://localhost:6379
