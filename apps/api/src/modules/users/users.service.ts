@@ -6,6 +6,9 @@ import * as bcrypt from 'bcryptjs';
 
 interface Requester { sub: string; role: Role; district?: string; }
 
+/** Fields excluded from all API responses */
+const INTERNAL_FIELDS = ['passwordHash', 'openid'];
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -14,11 +17,17 @@ export class UsersService {
   ) {}
 
   async create(dto: { phone: string; name: string; role: Role; password?: string; skills?: string[]; district?: string }, requester: Requester) {
-    if (dto.role !== Role.FAMILY && !dto.password) throw new BadRequestException('非家属角色必须设置密码');
+    if (dto.role === Role.FAMILY && dto.password) {
+      throw new BadRequestException('家属角色不允许设置后台密码');
+    }
+    if (dto.role !== Role.FAMILY && !dto.password) {
+      throw new BadRequestException('非家属角色必须设置密码');
+    }
     const passwordHash = dto.password ? await bcrypt.hash(dto.password, 10) : undefined;
     const encryptedPhone = this.crypto.encrypt(dto.phone);
+    const phoneHash = this.crypto.hashPhone(dto.phone);
     const user = await this.prisma.user.create({
-      data: { phone: encryptedPhone, name: dto.name, role: dto.role, passwordHash, skills: dto.skills ?? [], district: dto.district ?? null },
+      data: { phone: encryptedPhone, phoneHash, name: dto.name, role: dto.role, passwordHash, skills: dto.skills ?? [], district: dto.district ?? null },
     });
     return this.sanitizeUser(user, requester);
   }
@@ -32,7 +41,22 @@ export class UsersService {
       this.prisma.user.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),
       this.prisma.user.count({ where }),
     ]);
-    return { items: items.map((u) => ({ ...u, phone: null })), total, page, limit };
+    return {
+      items: items.map((u) => ({
+        id: u.id,
+        name: u.name,
+        phone: null,
+        role: u.role,
+        skills: u.skills,
+        district: u.district,
+        dutyStatus: u.dutyStatus,
+        avgResponseMin: u.avgResponseMin,
+        createdAt: u.createdAt,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   async findById(id: string, requester: Requester) {
@@ -51,7 +75,7 @@ export class UsersService {
         ...(dto.dutyStatus !== undefined && { dutyStatus: dto.dutyStatus }),
       },
     });
-    return { ...user, phone: null };
+    return this.stripInternal(user);
   }
 
   async updateDutyStatus(id: string, status: DutyStatus, requester: Requester) {
@@ -70,6 +94,11 @@ export class UsersService {
       role: user.role, skills: user.skills, district: user.district,
       dutyStatus: user.dutyStatus, avgResponseMin: user.avgResponseMin, createdAt: user.createdAt,
     };
+  }
+
+  private stripInternal(user: any) {
+    const { passwordHash, openid, ...safe } = user;
+    return { ...safe, phone: null };
   }
 
   private tryDecrypt(value: string | null): string | null {

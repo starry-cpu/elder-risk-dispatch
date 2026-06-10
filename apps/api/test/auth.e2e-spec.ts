@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
+import { FieldEncryptionService } from '../src/common/crypto/field-encryption.service';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { Role } from '@prisma/client';
@@ -23,14 +25,20 @@ describe('Auth E2E', () => {
     app.useGlobalInterceptors(new ResponseInterceptor());
     await app.init();
 
-    // Seed test admin user into the test database
+    // Seed test admin user — use the same encryption path as production
     const prisma = app.get(PrismaService);
+    const cryptoService = app.get(FieldEncryptionService);
     const passwordHash = await bcrypt.hash('admin123', 10);
+    const phone = '13800000000';
+    const encryptedPhone = cryptoService.encrypt(phone);
+    const phoneHash = cryptoService.hashPhone(phone);
+
     await prisma.user.upsert({
-      where: { phone: '13800000000' },
+      where: { phoneHash },
       update: {},
       create: {
-        phone: '13800000000',
+        phone: encryptedPhone,
+        phoneHash,
         name: '系统管理员',
         role: Role.ADMIN,
         passwordHash,

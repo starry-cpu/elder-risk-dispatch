@@ -82,7 +82,8 @@ model User {
   id             String      @id @default(cuid())
   openid         String?     @unique
   unionid        String?
-  phone          String?     @unique
+  phone          String?
+  phoneHash      String?     @unique
   name           String
   role           Role
   passwordHash   String?

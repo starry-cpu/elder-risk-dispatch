@@ -68,6 +68,7 @@ describe('EldersService', () => {
       };
       return map[v] || v;
     }),
+    hashPhone: jest.fn().mockReturnValue('test-hash'),
   };
 
   beforeEach(async () => {
@@ -119,6 +120,25 @@ describe('EldersService', () => {
       expect(crypto.encrypt).toHaveBeenCalledWith('110101199001011234');
       expect(result.name).toBe('张大爷');
     });
+
+    it('should reject worker creating elder in other district', async () => {
+      await expect(
+        service.create(
+          { name: 'Test', district: '海淀区' },
+          worker,
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('findAll', () => {
+    it('should force district filter for non-ADMIN user', async () => {
+      mockPrisma.elder.findMany.mockResolvedValue([]);
+      mockPrisma.elder.count.mockResolvedValue(0);
+
+      await service.findAll({}, worker);
+      expect(mockPrisma.elder.findMany).toHaveBeenCalled();
+    });
   });
 
   describe('findById', () => {
@@ -135,12 +155,8 @@ describe('EldersService', () => {
         serviceLevel: 'KEY',
         contacts: [
           {
-            id: 'c1',
-            name: '张小明',
-            relation: '子女',
-            phone: 'iv4:tag4:contact-encrypted',
-            isPrimary: true,
-            elderId: 'elder-1',
+            id: 'c1', name: '张小明', relation: '子女',
+            phone: 'iv4:tag4:contact-encrypted', isPrimary: true, elderId: 'elder-1',
           },
         ],
         familyLinks: [],
@@ -153,24 +169,11 @@ describe('EldersService', () => {
 
     it('same-district worker sees null idCard and decrypted address', async () => {
       mockPrisma.elder.findUnique.mockResolvedValue({
-        id: 'elder-1',
-        name: '张大爷',
-        gender: 'M',
-        birthDate: new Date('1945-03-10'),
-        idCard: encryptedIdCard,
-        address: encryptedAddress,
-        district: '朝阳区',
-        healthTags: ['慢病'],
-        serviceLevel: 'KEY',
+        id: 'elder-1', name: '张大爷', gender: 'M',
+        birthDate: new Date('1945-03-10'), idCard: encryptedIdCard, address: encryptedAddress,
+        district: '朝阳区', healthTags: ['慢病'], serviceLevel: 'KEY',
         contacts: [
-          {
-            id: 'c1',
-            name: '张小明',
-            relation: '子女',
-            phone: 'iv4:tag4:contact-encrypted',
-            isPrimary: true,
-            elderId: 'elder-1',
-          },
+          { id: 'c1', name: '张小明', relation: '子女', phone: 'iv4:tag4:contact-encrypted', isPrimary: true, elderId: 'elder-1' },
         ],
         familyLinks: [],
       });
@@ -182,17 +185,9 @@ describe('EldersService', () => {
 
     it('different-district worker gets 403', async () => {
       mockPrisma.elder.findUnique.mockResolvedValue({
-        id: 'elder-1',
-        name: '张大爷',
-        district: '朝阳区',
-        gender: 'M',
-        birthDate: null,
-        idCard: null,
-        address: null,
-        healthTags: [],
-        serviceLevel: 'NORMAL',
-        contacts: [],
-        familyLinks: [],
+        id: 'elder-1', name: '张大爷', district: '朝阳区',
+        gender: 'M', birthDate: null, idCard: null, address: null,
+        healthTags: [], serviceLevel: 'NORMAL', contacts: [], familyLinks: [],
       });
 
       await expect(service.findById('elder-1', otherWorker)).rejects.toThrow();
@@ -201,7 +196,10 @@ describe('EldersService', () => {
 
   describe('getRiskProfile', () => {
     it('should return aggregated risk profile', async () => {
-      mockPrisma.elder.findUnique.mockResolvedValue({ id: 'elder-1', name: '张大爷', serviceLevel: 'KEY' });
+      mockPrisma.elder.findUnique.mockResolvedValue({
+        id: 'elder-1', name: '张大爷', serviceLevel: 'KEY',
+        district: '朝阳区', familyLinks: [],
+      });
       mockPrisma.checkIn.count.mockResolvedValue(25);
       mockPrisma.visitRecord.count.mockResolvedValue(8);
       mockPrisma.riskEvent.findFirst.mockResolvedValue(null);
@@ -209,12 +207,57 @@ describe('EldersService', () => {
       mockPrisma.riskEvent.count.mockResolvedValue(0);
       mockPrisma.workOrder.count.mockResolvedValue(3);
 
-      const result = await service.getRiskProfile('elder-1');
+      const result = await service.getRiskProfile('elder-1', admin);
       expect(result).toHaveProperty('elderId', 'elder-1');
       expect(result.stats.totalCheckIns).toBe(25);
       expect(result.stats.completedWorkOrders).toBe(3);
       expect(result).toHaveProperty('currentRisk');
       expect(result).toHaveProperty('recentRiskEvents');
+    });
+  });
+
+  describe('update', () => {
+    it('should check district authorization before updating', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue({
+        id: 'elder-1', district: '朝阳区', familyLinks: [],
+      });
+      mockPrisma.elder.update.mockResolvedValue({
+        id: 'elder-1', name: 'Updated', district: '朝阳区', contacts: [],
+      });
+
+      const result = await service.update('elder-1', { name: 'Updated' }, admin);
+      expect(result.name).toBe('Updated');
+    });
+  });
+
+  describe('addContact', () => {
+    it('should check authorization before adding contact', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue({
+        id: 'elder-1', district: '朝阳区', familyLinks: [],
+      });
+      mockPrisma.emergencyContact.create.mockResolvedValue({
+        id: 'c1', elderId: 'elder-1', name: '张小明', relation: '子女',
+        phone: 'iv4:tag4:contact-encrypted', isPrimary: true,
+      });
+
+      const result = await service.addContact('elder-1', {
+        name: '张小明', relation: '子女', phone: '13900139000',
+      }, admin);
+      expect(result.name).toBe('张小明');
+    });
+  });
+
+  describe('getContacts', () => {
+    it('should check authorization before listing contacts', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue({
+        id: 'elder-1', district: '朝阳区', familyLinks: [],
+      });
+      mockPrisma.emergencyContact.findMany.mockResolvedValue([
+        { id: 'c1', elderId: 'elder-1', name: '张小明', relation: '子女', phone: 'iv4:tag4:contact-encrypted', isPrimary: true },
+      ]);
+
+      const result = await service.getContacts('elder-1', admin);
+      expect(result).toHaveLength(1);
     });
   });
 });

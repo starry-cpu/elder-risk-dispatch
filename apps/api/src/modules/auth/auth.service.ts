@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { FieldEncryptionService } from '../../common/crypto/field-encryption.service';
 import * as bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { JwtPayload } from './strategies/jwt.strategy';
@@ -10,10 +11,12 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly crypto: FieldEncryptionService,
   ) {}
 
   async adminLogin(dto: { phone: string; password: string }) {
-    const user = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    const phoneHash = this.crypto.hashPhone(dto.phone);
+    const user = await this.prisma.user.findUnique({ where: { phoneHash } });
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('手机号或密码错误');
     }
@@ -64,7 +67,6 @@ export class AuthService {
   private sanitizeUser(user: any) {
     return {
       id: user.id,
-      openid: user.openid,
       name: user.name,
       phone: user.phone,
       role: user.role,

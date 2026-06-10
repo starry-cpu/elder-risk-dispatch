@@ -77,6 +77,20 @@ describe('FieldEncryptionService', () => {
     expect(service.decrypt(encrypted)).toBe(longText);
   });
 
+  it('should produce deterministic hash for the same phone', () => {
+    const hash1 = service.hashPhone('13800138000');
+    const hash2 = service.hashPhone('13800138000');
+    expect(hash1).toBe(hash2);
+    expect(typeof hash1).toBe('string');
+    expect(hash1.length).toBe(64); // SHA-256 hex
+  });
+
+  it('should produce different hashes for different phones', () => {
+    const hash1 = service.hashPhone('13800138000');
+    const hash2 = service.hashPhone('13900139000');
+    expect(hash1).not.toBe(hash2);
+  });
+
   it('should throw if FIELD_ENCRYPTION_KEY is not set', () => {
     delete process.env.FIELD_ENCRYPTION_KEY;
     expect(() => new FieldEncryptionService()).toThrow();

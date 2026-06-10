@@ -20,6 +20,13 @@ export class EldersService {
 
   async create(dto: any, requester: Requester) {
     const { contacts, ...elderData } = dto;
+    // District isolation: non-ADMIN must create in own district
+    if (requester.role !== Role.ADMIN && requester.district) {
+      if (elderData.district && elderData.district !== requester.district) {
+        throw new ForbiddenException('无权限在他人片区创建老人档案');
+      }
+      elderData.district = requester.district;
+    }
     const encryptedData: any = { ...elderData };
     for (const field of ENCRYPT_FIELDS) {
       if (encryptedData[field]) {
@@ -54,12 +61,19 @@ export class EldersService {
     limit?: number;
     district?: string;
     serviceLevel?: ServiceLevel;
-  }) {
+  }, requester: Requester) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
     const where: any = {};
-    if (query.district) where.district = query.district;
+    // District isolation: non-ADMIN only see their own district
+    if (requester.role !== Role.ADMIN) {
+      if (requester.district) {
+        where.district = requester.district;
+      }
+    } else if (query.district) {
+      where.district = query.district;
+    }
     if (query.serviceLevel) where.serviceLevel = query.serviceLevel;
     const [items, total] = await Promise.all([
       this.prisma.elder.findMany({
@@ -85,24 +99,18 @@ export class EldersService {
       include: { contacts: true, familyLinks: true },
     });
     if (!elder) throw new BadRequestException('老人不存在');
-    if (requester.role !== Role.ADMIN) {
-      if (requester.role === Role.FAMILY) {
-        const isLinked = elder.familyLinks.some(
-          (fl: any) => fl.userId === requester.sub,
-        );
-        if (!isLinked)
-          throw new ForbiddenException('无权限查看此老人信息');
-      } else if (
-        requester.district &&
-        elder.district !== requester.district
-      ) {
-        throw new ForbiddenException('无权限查看其他片区的老人信息');
-      }
-    }
+    this.authorizeAccess(elder, requester);
     return this.sanitizeElder(elder, requester);
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: any, requester: Requester) {
+    const elder = await this.prisma.elder.findUnique({
+      where: { id },
+      include: { familyLinks: true },
+    });
+    if (!elder) throw new BadRequestException('老人不存在');
+    this.authorizeAccess(elder, requester);
+
     const encryptedData: any = { ...dto };
     for (const field of ENCRYPT_FIELDS) {
       if (encryptedData[field]) {
@@ -112,12 +120,12 @@ export class EldersService {
     if (encryptedData.birthDate) {
       encryptedData.birthDate = new Date(encryptedData.birthDate);
     }
-    const elder = await this.prisma.elder.update({
+    const updated = await this.prisma.elder.update({
       where: { id },
       data: encryptedData,
       include: { contacts: true },
     });
-    return this.maskSensitive(elder);
+    return this.maskSensitive(updated);
   }
 
   async addContact(elderId: string, dto: {
@@ -125,7 +133,14 @@ export class EldersService {
     relation: string;
     phone: string;
     isPrimary?: boolean;
-  }) {
+  }, requester: Requester) {
+    const elder = await this.prisma.elder.findUnique({
+      where: { id: elderId },
+      include: { familyLinks: true },
+    });
+    if (!elder) throw new BadRequestException('老人不存在');
+    this.authorizeAccess(elder, requester);
+
     const contact = await this.prisma.emergencyContact.create({
       data: {
         elderId,
@@ -138,19 +153,28 @@ export class EldersService {
     return { ...contact, phone: this.crypto.decrypt(contact.phone) };
   }
 
-  async getContacts(elderId: string) {
+  async getContacts(elderId: string, requester: Requester) {
+    const elder = await this.prisma.elder.findUnique({
+      where: { id: elderId },
+      include: { familyLinks: true },
+    });
+    if (!elder) throw new BadRequestException('老人不存在');
+    this.authorizeAccess(elder, requester);
+
     const contacts = await this.prisma.emergencyContact.findMany({
       where: { elderId },
     });
     return contacts.map((c) => ({ ...c, phone: this.tryDecrypt(c.phone) }));
   }
 
-  async getRiskProfile(elderId: string) {
+  async getRiskProfile(elderId: string, requester: Requester) {
     const elder = await this.prisma.elder.findUnique({
       where: { id: elderId },
-      select: { id: true, name: true, serviceLevel: true },
+      include: { familyLinks: true },
     });
     if (!elder) throw new BadRequestException('老人不存在');
+    this.authorizeAccess(elder, requester);
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const [
@@ -217,6 +241,21 @@ export class EldersService {
     return this.prisma.elderFamilyLink.create({
       data: { elderId, userId, relation },
     });
+  }
+
+  /** Shared authorization check: district isolation + family link */
+  private authorizeAccess(elder: any, requester: Requester) {
+    if (requester.role === Role.ADMIN) return;
+    if (requester.role === Role.FAMILY) {
+      const isLinked = elder.familyLinks?.some(
+        (fl: any) => fl.userId === requester.sub,
+      );
+      if (!isLinked) throw new ForbiddenException('无权限查看此老人信息');
+      return;
+    }
+    if (requester.district && elder.district !== requester.district) {
+      throw new ForbiddenException('无权限查看其他片区的老人信息');
+    }
   }
 
   private sanitizeElder(elder: any, requester: Requester) {

@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateContactDto {
@@ -16,5 +16,6 @@ export class CreateContactDto {
 
   @ApiProperty({ description: '是否主要联系人', required: false })
   @IsOptional()
+  @IsBoolean()
   isPrimary?: boolean;
 }

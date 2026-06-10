@@ -24,13 +24,13 @@
 
 ```json
 {
-  "@nestjs/jwt": "^11.0.0",
-  "@nestjs/passport": "^11.0.0",
+  "@nestjs/jwt": "^11.0.2",
+  "@nestjs/passport": "^11.0.5",
   "passport": "^0.7.0",
-  "passport-jwt": "^4.0.0",
-  "bcryptjs": "^2.4.3",
-  "@types/passport-jwt": "^4.0.0",
-  "@types/bcryptjs": "^2.4.0"
+  "passport-jwt": "^4.0.1",
+  "bcryptjs": "^3.0.3",
+  "@types/passport-jwt": "^4.0.1",
+  "@types/bcryptjs": "^3.0.0"
 }
 ```
 
@@ -156,7 +156,7 @@ interface JwtPayload {
 
 - **JwtAuthGuard**：通过 `APP_GUARD` 全局注册，继承 `AuthGuard('jwt')`
 - **@Public()** 装饰器标记的端点跳过 JWT 校验
-- **RolesGuard**：读取 `@Roles()` 装饰器，默认拒绝未标注的端点
+- **RolesGuard**：读取 `@Roles()` 装饰器，仅检查标注了 `@Roles()` 的端点；未标注的端点不做角色限制
 - **片区隔离**：通过对比 `req.user.district` 与资源 `district` 字段实现
 
 ### 4.5 装饰器

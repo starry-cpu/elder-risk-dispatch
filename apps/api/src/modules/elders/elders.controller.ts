@@ -36,8 +36,9 @@ export class EldersController {
     @Query('limit') limit?: number,
     @Query('district') district?: string,
     @Query('serviceLevel') serviceLevel?: ServiceLevel,
+    @CurrentUser() user?: any,
   ) {
-    return this.eldersService.findAll({ page, limit, district, serviceLevel });
+    return this.eldersService.findAll({ page, limit, district, serviceLevel }, user);
   }
 
   @Get(':id')
@@ -49,27 +50,27 @@ export class EldersController {
   @Patch(':id')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '更新老人档案' })
-  update(@Param('id') id: string, @Body() dto: UpdateElderDto) {
-    return this.eldersService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateElderDto, @CurrentUser() user: any) {
+    return this.eldersService.update(id, dto, user);
   }
 
   @Post(':id/contacts')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '添加紧急联系人' })
-  addContact(@Param('id') elderId: string, @Body() dto: CreateContactDto) {
-    return this.eldersService.addContact(elderId, dto);
+  addContact(@Param('id') elderId: string, @Body() dto: CreateContactDto, @CurrentUser() user: any) {
+    return this.eldersService.addContact(elderId, dto, user);
   }
 
   @Get(':id/contacts')
   @ApiOperation({ summary: '查看紧急联系人' })
-  getContacts(@Param('id') elderId: string) {
-    return this.eldersService.getContacts(elderId);
+  getContacts(@Param('id') elderId: string, @CurrentUser() user: any) {
+    return this.eldersService.getContacts(elderId, user);
   }
 
   @Get(':id/risk-profile')
   @ApiOperation({ summary: '风险画像聚合' })
-  getRiskProfile(@Param('id') elderId: string) {
-    return this.eldersService.getRiskProfile(elderId);
+  getRiskProfile(@Param('id') elderId: string, @CurrentUser() user: any) {
+    return this.eldersService.getRiskProfile(elderId, user);
   }
 
   @Post(':id/link-family')

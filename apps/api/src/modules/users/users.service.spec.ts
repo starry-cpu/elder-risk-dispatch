@@ -11,6 +11,7 @@ describe('UsersService', () => {
   let crypto: FieldEncryptionService;
 
   const encryptedPhone = 'ab:cd:ef123456';
+  const phoneHash = 'sha256-hash-13800138000';
 
   const mockPrisma = {
     user: {
@@ -28,6 +29,7 @@ describe('UsersService', () => {
       if (val === encryptedPhone) return '13800138000';
       return val;
     }),
+    hashPhone: jest.fn().mockReturnValue(phoneHash),
   };
 
   const adminUser = { sub: 'admin-1', role: Role.ADMIN, district: '朝阳区', loginType: 'admin' };
@@ -50,9 +52,9 @@ describe('UsersService', () => {
   });
 
   describe('create', () => {
-    it('should create a user with encrypted phone', async () => {
+    it('should create a user with encrypted phone and phoneHash', async () => {
       mockPrisma.user.create.mockResolvedValue({
-        id: 'user-1', phone: encryptedPhone, name: '网格员A',
+        id: 'user-1', phone: encryptedPhone, phoneHash, name: '网格员A',
         role: Role.GRID_WORKER, skills: [], district: '朝阳区',
         dutyStatus: 'OFF_DUTY', createdAt: new Date(),
       });
@@ -63,6 +65,7 @@ describe('UsersService', () => {
       }, adminUser);
 
       expect(crypto.encrypt).toHaveBeenCalledWith('13800138000');
+      expect(crypto.hashPhone).toHaveBeenCalledWith('13800138000');
       expect(mockPrisma.user.create).toHaveBeenCalled();
       expect(result.name).toBe('网格员A');
     });
@@ -70,6 +73,12 @@ describe('UsersService', () => {
     it('should throw if non-FAMILY user has no password', async () => {
       await expect(
         service.create({ phone: '13800138000', name: 'NoPass', role: Role.ADMIN }, adminUser),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw if FAMILY user tries to set password', async () => {
+      await expect(
+        service.create({ phone: '13900139000', name: '家属A', role: Role.FAMILY, password: 'pass123' }, adminUser),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -89,14 +98,21 @@ describe('UsersService', () => {
   });
 
   describe('findAll', () => {
-    it('should return paginated user list (ADMIN)', async () => {
-      mockPrisma.user.findMany.mockResolvedValue([]);
-      mockPrisma.user.count.mockResolvedValue(0);
+    it('should return paginated list without exposing sensitive fields', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([{
+        id: 'user-1', phone: encryptedPhone, phoneHash, name: 'Test',
+        role: Role.GRID_WORKER, district: '朝阳区', skills: [],
+        passwordHash: 'hashed-secret', openid: 'secret-openid',
+        dutyStatus: 'OFF_DUTY', avgResponseMin: null, createdAt: new Date(),
+      }]);
+      mockPrisma.user.count.mockResolvedValue(1);
 
       const result = await service.findAll({ page: 1, limit: 10 });
       expect(result).toHaveProperty('items');
       expect(result).toHaveProperty('total');
-      expect(result).toHaveProperty('page', 1);
+      expect(result.items[0]).not.toHaveProperty('passwordHash');
+      expect(result.items[0]).not.toHaveProperty('openid');
+      expect(result.items[0].phone).toBeNull();
     });
   });
 

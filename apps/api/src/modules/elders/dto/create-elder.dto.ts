@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, IsNumber, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ServiceLevel } from '@prisma/client';
 
@@ -17,6 +17,7 @@ export class CreateElderContactDto {
 
   @ApiProperty({ description: '是否主要联系人', required: false })
   @IsOptional()
+  @IsBoolean()
   isPrimary?: boolean;
 }
 

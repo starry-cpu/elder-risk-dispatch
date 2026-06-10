@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { FieldEncryptionService } from '../../common/crypto/field-encryption.service';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
@@ -9,6 +10,8 @@ describe('AuthService', () => {
   let service: AuthService;
   let prisma: PrismaService;
   let jwt: JwtService;
+
+  const phoneHash = 'sha256-hash-of-13800138000';
 
   const mockPrisma = {
     user: {
@@ -22,12 +25,19 @@ describe('AuthService', () => {
     sign: jest.fn().mockReturnValue('mock-jwt-token'),
   };
 
+  const mockCrypto = {
+    hashPhone: jest.fn().mockReturnValue(phoneHash),
+    encrypt: jest.fn(),
+    decrypt: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwt },
+        { provide: FieldEncryptionService, useValue: mockCrypto },
       ],
     }).compile();
 
@@ -41,7 +51,8 @@ describe('AuthService', () => {
       const hash = await bcrypt.hash('password123', 10);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
-        phone: '13800138000',
+        phoneHash,
+        phone: 'encrypted-phone',
         name: '管理员',
         role: Role.ADMIN,
         passwordHash: hash,
@@ -52,6 +63,8 @@ describe('AuthService', () => {
       });
 
       const result = await service.adminLogin({ phone: '13800138000', password: 'password123' });
+      expect(mockCrypto.hashPhone).toHaveBeenCalledWith('13800138000');
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({ where: { phoneHash } });
       expect(result).toHaveProperty('token');
       expect(result).toHaveProperty('user');
       expect(result.user.role).toBe(Role.ADMIN);
@@ -61,7 +74,7 @@ describe('AuthService', () => {
       const hash = await bcrypt.hash('password123', 10);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
-        phone: '13800138000',
+        phoneHash,
         name: '管理员',
         role: Role.ADMIN,
         passwordHash: hash,
@@ -82,7 +95,7 @@ describe('AuthService', () => {
       const hash = await bcrypt.hash('password123', 10);
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'user-2',
-        phone: '13900139000',
+        phoneHash: 'fam-hash',
         name: '家属',
         role: Role.FAMILY,
         passwordHash: hash,
@@ -90,6 +103,27 @@ describe('AuthService', () => {
       await expect(
         service.adminLogin({ phone: '13900139000', password: 'password123' }),
       ).rejects.toThrow();
+    });
+
+    it('should NOT expose openid in sanitized response', async () => {
+      const hash = await bcrypt.hash('password123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        phoneHash,
+        phone: 'encrypted-phone',
+        openid: 'secret-openid-should-not-leak',
+        name: '管理员',
+        role: Role.ADMIN,
+        passwordHash: hash,
+        district: '朝阳区',
+        skills: [],
+        dutyStatus: 'OFF_DUTY',
+        createdAt: new Date(),
+      });
+
+      const result = await service.adminLogin({ phone: '13800138000', password: 'password123' });
+      expect(result.user).not.toHaveProperty('openid');
+      expect(result.user).not.toHaveProperty('passwordHash');
     });
   });
 
@@ -125,7 +159,8 @@ describe('AuthService', () => {
       });
       const result = await service.wechatLogin('openid-new', undefined);
       expect(mockPrisma.user.upsert).toHaveBeenCalled();
-      expect(result.user.openid).toBe('openid-new');
+      expect(result.user).not.toHaveProperty('openid');
+      expect(result.user.name).toBe('新用户');
     });
   });
 

@@ -27,6 +27,10 @@ export class FieldEncryptionService {
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
   }
 
+  hashPhone(phone: string): string {
+    return crypto.createHash('sha256').update(phone).digest('hex');
+  }
+
   decrypt(ciphertext: string): string {
     const parts = ciphertext.split(':');
     if (parts.length !== 3) {
