@@ -1,9 +1,10 @@
-import { IsString, IsIn } from 'class-validator';
+import { IsString, IsIn, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class PresignedUrlDto {
   @ApiProperty({ description: '文件名（含扩展名）', example: 'recording-001.mp3' })
   @IsString()
+  @Matches(/^[\w,\-\.]+$/)
   fileName!: string;
 
   @ApiProperty({
@@ -12,6 +13,7 @@ export class PresignedUrlDto {
     enum: ['audio/mp3', 'audio/wav', 'audio/m4a', 'image/jpeg', 'image/png', 'image/webp', 'image/heic'],
   })
   @IsString()
+  @IsIn(['audio/mp3', 'audio/wav', 'audio/m4a', 'image/jpeg', 'image/png', 'image/webp', 'image/heic'])
   contentType!: string;
 
   @ApiProperty({
