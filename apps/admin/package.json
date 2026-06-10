@@ -1,0 +1,11 @@
+{
+  "name": "@care/admin",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'admin placeholder'",
+    "build": "echo 'admin build placeholder'",
+    "lint": "echo 'admin lint placeholder'",
+    "test": "echo 'admin test placeholder'"
+  }
+}

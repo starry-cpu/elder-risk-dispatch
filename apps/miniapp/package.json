@@ -1,0 +1,11 @@
+{
+  "name": "@care/miniapp",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'miniapp placeholder'",
+    "build": "echo 'miniapp build placeholder'",
+    "lint": "echo 'miniapp lint placeholder'",
+    "test": "echo 'miniapp test placeholder'"
+  }
+}
