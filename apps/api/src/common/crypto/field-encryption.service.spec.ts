@@ -3,10 +3,23 @@ import { FieldEncryptionService } from './field-encryption.service';
 
 describe('FieldEncryptionService', () => {
   let service: FieldEncryptionService;
+  let originalKey: string | undefined;
+
+  beforeAll(() => {
+    originalKey = process.env.FIELD_ENCRYPTION_KEY;
+  });
 
   beforeEach(() => {
     process.env.FIELD_ENCRYPTION_KEY = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI='; // 32 bytes base64
     service = new FieldEncryptionService();
+  });
+
+  afterAll(() => {
+    if (originalKey === undefined) {
+      delete process.env.FIELD_ENCRYPTION_KEY;
+    } else {
+      process.env.FIELD_ENCRYPTION_KEY = originalKey;
+    }
   });
 
   it('should be defined', () => {
