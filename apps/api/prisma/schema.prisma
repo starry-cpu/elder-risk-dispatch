@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  GRID_WORKER
+  COMMUNITY_DOCTOR
+  PROPERTY
+  VOLUNTEER
+  ADMIN
+  FAMILY
+}
+
+enum DutyStatus {
+  ON_DUTY
+  OFF_DUTY
+}
+
+enum ServiceLevel {
+  NORMAL
+  KEY
+  HIGH
+}
+
+enum CheckInMethod {
+  ONE_TAP
+  VOICE
+  TEXT
+  PROXY
+}
+
+enum CheckInStatus {
+  NORMAL
+  ABNORMAL
+  MISSED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RiskSource {
+  MISSED_CHECKIN
+  ABNORMAL_TEXT
+  DEVICE
+  HISTORY
+  MANUAL
+}
+
+enum RiskStatus {
+  PENDING_REVIEW
+  CONFIRMED
+  IGNORED
+  DISPATCHED
+}
+
+enum WorkOrderType {
+  HEALTH
+  LIFE
+  REPAIR
+  ESCORT
+  COMPANION
+  ERRAND
+}
+
+enum WorkOrderStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id             String      @id @default(cuid())
+  openid         String?     @unique
+  unionid        String?
+  phone          String?     @unique
+  name           String
+  role           Role
+  passwordHash   String?
+  skills         String[]    @default([])
+  district       String?
+  dutyStatus     DutyStatus  @default(OFF_DUTY)
+  avgResponseMin Int?
+  createdAt      DateTime    @default(now())
+  visits         VisitRecord[]
+  workOrders     WorkOrder[] @relation("assignee")
+  familyLinks    ElderFamilyLink[]
+}
+
+model Elder {
+  id           String        @id @default(cuid())
+  name         String
+  gender       String?
+  birthDate    DateTime?
+  idCard       String?
+  address      String?
+  district     String
+  longitude    Float?
+  latitude     Float?
+  healthTags   String[]      @default([])
+  serviceLevel ServiceLevel  @default(NORMAL)
+  livingStatus String?
+  createdAt    DateTime      @default(now())
+  contacts     EmergencyContact[]
+  checkIns     CheckIn[]
+  visits       VisitRecord[]
+  devices      DeviceData[]
+  riskEvents   RiskEvent[]
+  workOrders   WorkOrder[]
+  familyLinks  ElderFamilyLink[]
+}
+
+model EmergencyContact {
+  id        String  @id @default(cuid())
+  elderId   String
+  name      String
+  relation  String
+  phone     String
+  isPrimary Boolean @default(false)
+  elder     Elder   @relation(fields: [elderId], references: [id], onDelete: Cascade)
+
+  @@index([elderId])
+}
+
+model ElderFamilyLink {
+  id       String @id @default(cuid())
+  elderId  String
+  userId   String
+  relation String
+  elder    Elder  @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([elderId, userId])
+}
+
+model CheckIn {
+  id        String        @id @default(cuid())
+  elderId   String
+  method    CheckInMethod
+  content   String?
+  voiceUrl  String?
+  status    CheckInStatus @default(NORMAL)
+  createdAt DateTime      @default(now())
+  elder     Elder         @relation(fields: [elderId], references: [id], onDelete: Cascade)
+
+  @@index([elderId, createdAt])
+}
+
+model VisitRecord {
+  id           String   @id @default(cuid())
+  elderId      String
+  gridWorkerId String
+  visitTime    DateTime @default(now())
+  observation  String
+  photos       String[] @default([])
+  note         String?
+  elder        Elder    @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  gridWorker   User     @relation(fields: [gridWorkerId], references: [id])
+}
+
+model DeviceData {
+  id         String   @id @default(cuid())
+  elderId    String
+  deviceType String
+  metricType String
+  value      String?
+  alarm      Boolean  @default(false)
+  status     String?
+  timestamp  DateTime @default(now())
+  elder      Elder    @relation(fields: [elderId], references: [id], onDelete: Cascade)
+
+  @@index([elderId, timestamp])
+}
+
+model RiskEvent {
+  id          String     @id @default(cuid())
+  elderId     String
+  level       RiskLevel
+  source      RiskSource
+  score       Int
+  reason      String
+  status      RiskStatus @default(PENDING_REVIEW)
+  reviewedBy  String?
+  ruleVersion String?
+  createdAt   DateTime   @default(now())
+  elder       Elder      @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  workOrder   WorkOrder?
+
+  @@index([elderId, status])
+}
+
+model WorkOrder {
+  id             String             @id @default(cuid())
+  riskEventId    String?            @unique
+  elderId        String
+  type           WorkOrderType
+  level          RiskLevel
+  assigneeId     String?
+  status         WorkOrderStatus    @default(PENDING)
+  deadline       DateTime?
+  dispatchReason String?
+  result         String?
+  completedAt    DateTime?
+  createdById    String
+  createdAt      DateTime           @default(now())
+  elder          Elder              @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  riskEvent      RiskEvent?         @relation(fields: [riskEventId], references: [id])
+  assignee       User?              @relation("assignee", fields: [assigneeId], references: [id])
+  timeline       WorkOrderTimeline[]
+  evaluation     ServiceEvaluation?
+
+  @@index([status, deadline])
+}
+
+model WorkOrderTimeline {
+  id          String    @id @default(cuid())
+  workOrderId String
+  action      String
+  operatorId  String?
+  note        String?
+  createdAt   DateTime  @default(now())
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+}
+
+model ServiceEvaluation {
+  id          String    @id @default(cuid())
+  workOrderId String    @unique
+  rating      Int
+  comment     String?
+  tags        String[]  @default([])
+  createdAt   DateTime  @default(now())
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+}
+
+model RiskRule {
+  id          String   @id @default(cuid())
+  name        String
+  condition   Json
+  weight      Int
+  level       RiskLevel
+  version     Int      @default(1)
+  enabled     Boolean  @default(true)
+  createdById String?
+  updatedAt   DateTime @updatedAt
+}
+
+model AiInferenceLog {
+  id              String   @id @default(cuid())
+  type            String
+  model           String
+  input           Json
+  output          Json
+  humanCorrection Json?
+  createdAt       DateTime @default(now())
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  action       String
+  resourceType String
+  resourceId   String?
+  detail       Json?
+  ip           String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Notification {
+  id         String    @id @default(cuid())
+  targetType String
+  targetId   String
+  channel    String
+  templateId String?
+  payload    Json
+  status     String    @default("PENDING")
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+}
