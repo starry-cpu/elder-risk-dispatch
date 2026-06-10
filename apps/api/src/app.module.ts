@@ -6,6 +6,10 @@ import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { EldersModule } from './modules/elders/elders.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { CheckInsModule } from './modules/check-ins/check-ins.module';
+import { VisitsModule } from './modules/visits/visits.module';
+import { DevicesModule } from './modules/devices/devices.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -17,6 +21,10 @@ import { RolesGuard } from './common/guards/roles.guard';
     UsersModule,
     EldersModule,
     HealthModule,
+    UploadsModule,
+    CheckInsModule,
+    VisitsModule,
+    DevicesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
