@@ -5,7 +5,7 @@ describe('FieldEncryptionService', () => {
   let service: FieldEncryptionService;
 
   beforeEach(() => {
-    process.env.FIELD_ENCRYPTION_KEY = 'dGVzdC1rZXktMzItYnl0ZXMtbG9uZyEhIQ=='; // 32 bytes base64
+    process.env.FIELD_ENCRYPTION_KEY = 'MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI='; // 32 bytes base64
     service = new FieldEncryptionService();
   });
 
