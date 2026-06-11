@@ -10,6 +10,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
 import { CheckInsModule } from './modules/check-ins/check-ins.module';
 import { VisitsModule } from './modules/visits/visits.module';
 import { DevicesModule } from './modules/devices/devices.module';
+import { RiskModule } from './modules/risk/risk.module';
+import { AiModule } from './modules/ai/ai.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -25,6 +27,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     CheckInsModule,
     VisitsModule,
     DevicesModule,
+    RiskModule,
+    AiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
