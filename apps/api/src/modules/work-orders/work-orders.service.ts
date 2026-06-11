@@ -12,6 +12,16 @@ export interface Requester {
 
 const ASSIGNABLE_ROLES: Role[] = [Role.GRID_WORKER, Role.COMMUNITY_DOCTOR, Role.PROPERTY, Role.VOLUNTEER];
 
+function checkDistrictAccess(wo: { elder: { district: string } }, requester: Requester): void {
+  if (
+    requester.role !== Role.ADMIN &&
+    requester.district &&
+    wo.elder.district !== requester.district
+  ) {
+    throw new NotFoundException('工单不存在');
+  }
+}
+
 @Injectable()
 export class WorkOrdersService {
   constructor(
@@ -33,7 +43,7 @@ export class WorkOrdersService {
     const elder = await this.prisma.elder.findUnique({ where: { id: input.elderId } });
     if (!elder) throw new NotFoundException('老人不存在');
 
-    let riskEvent: any = null;
+    let riskEvent: { level: RiskLevel; status: RiskStatus; elder: { district: string } } | null = null;
     if (input.riskEventId) {
       riskEvent = await this.prisma.riskEvent.findUnique({
         where: { id: input.riskEventId },
@@ -76,17 +86,14 @@ export class WorkOrdersService {
       });
     }
 
-    // Get dispatch recommendation
+    // Get dispatch recommendation (only when linked to a risk event)
     let recommendation: any[] = [];
-    try {
-      // DispatchRecommendationService.recommend takes (riskEventId, workOrderType)
-      // Use riskEventId if available, otherwise fall back to elderId
-      recommendation = await this.dispatch.recommend(
-        input.riskEventId ?? input.elderId,
-        input.type,
-      );
-    } catch {
-      // Recommendation is optional — don't fail if it errors
+    if (input.riskEventId) {
+      try {
+        recommendation = await this.dispatch.recommend(input.riskEventId, input.type);
+      } catch {
+        // Recommendation is optional — don't fail if it errors
+      }
     }
 
     return { workOrder, recommendation };
@@ -151,14 +158,7 @@ export class WorkOrdersService {
     });
     if (!wo) throw new NotFoundException('工单不存在');
 
-    if (
-      requester &&
-      requester.role !== Role.ADMIN &&
-      requester.district &&
-      wo.elder.district !== requester.district
-    ) {
-      throw new NotFoundException('工单不存在');
-    }
+    if (requester) checkDistrictAccess(wo, requester);
 
     return wo;
   }
@@ -169,6 +169,7 @@ export class WorkOrdersService {
       include: { elder: { select: { district: true } } },
     });
     if (!wo) throw new NotFoundException('工单不存在');
+    checkDistrictAccess(wo, requester);
 
     const user = await this.prisma.user.findUnique({ where: { id: assigneeId } });
     if (!user) throw new NotFoundException('用户不存在');
@@ -203,6 +204,7 @@ export class WorkOrdersService {
       include: { elder: { select: { district: true } } },
     });
     if (!wo) throw new NotFoundException('工单不存在');
+    checkDistrictAccess(wo, requester);
 
     WorkOrderStateMachine.transition(wo.status, WorkOrderStatus.IN_PROGRESS, {
       isAssignee: wo.assigneeId === requester.sub,
@@ -234,6 +236,7 @@ export class WorkOrdersService {
       include: { elder: { select: { district: true } } },
     });
     if (!wo) throw new NotFoundException('工单不存在');
+    checkDistrictAccess(wo, requester);
 
     if (wo.assigneeId !== requester.sub) {
       throw new ForbiddenException('只有接单人员可以完成工单');
@@ -268,6 +271,7 @@ export class WorkOrdersService {
       include: { elder: { select: { district: true } } },
     });
     if (!wo) throw new NotFoundException('工单不存在');
+    checkDistrictAccess(wo, requester);
 
     const hasReason = reason !== undefined && reason.trim().length > 0;
 
@@ -307,6 +311,7 @@ export class WorkOrdersService {
       },
     });
     if (!wo) throw new NotFoundException('工单不存在');
+    checkDistrictAccess(wo, requester);
 
     const newUser = await this.prisma.user.findUnique({ where: { id: newAssigneeId } });
     if (!newUser) throw new NotFoundException('用户不存在');
@@ -342,15 +347,7 @@ export class WorkOrdersService {
       include: { elder: { select: { district: true } } },
     });
     if (!wo) throw new NotFoundException('工单不存在');
-
-    if (
-      requester &&
-      requester.role !== Role.ADMIN &&
-      requester.district &&
-      wo.elder.district !== requester.district
-    ) {
-      throw new NotFoundException('工单不存在');
-    }
+    if (requester) checkDistrictAccess(wo, requester);
 
     return this.prisma.workOrderTimeline.findMany({
       where: { workOrderId: id },

@@ -112,7 +112,7 @@ describe('WorkOrdersService', () => {
 
       expect(result.workOrder).toBeDefined();
       expect(result.recommendation).toEqual([]);
-      expect(mockDispatch.recommend).toHaveBeenCalledWith('elder-1', WorkOrderType.LIFE);
+      expect(mockDispatch.recommend).not.toHaveBeenCalled();
     });
   });
 
