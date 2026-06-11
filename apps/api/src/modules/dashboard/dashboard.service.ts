@@ -150,11 +150,6 @@ export class DashboardService {
         count: r._count.id,
       })),
       byType: byType.map((r) => ({ type: r.type, count: r._count.id })),
-      avgResponseHours:
-        completedCount > 0
-          ? Math.round((totalCompletionMs / completedCount / 3600000) * 100) /
-            100
-          : 0,
       avgCompletionHours:
         completedCount > 0
           ? Math.round((totalCompletionMs / completedCount / 3600000) * 100) /

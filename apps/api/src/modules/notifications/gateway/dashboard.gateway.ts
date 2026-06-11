@@ -11,7 +11,10 @@ import { NotificationsService } from '../notifications.service';
 
 @WebSocketGateway({
   namespace: '/dashboard',
-  cors: { origin: '*', credentials: true },
+  cors: {
+    origin: process.env.CORS_ORIGIN?.split(',') ?? ['http://localhost:3000'],
+    credentials: true,
+  },
 })
 export class DashboardGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
