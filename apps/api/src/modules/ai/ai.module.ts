@@ -3,9 +3,11 @@ import { Module } from '@nestjs/common';
 import OpenAI from 'openai';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiClient, OPENAI_CLIENT } from './ai-client.service';
+import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 
 @Module({
+  controllers: [AiController],
   providers: [
     {
       provide: OPENAI_CLIENT,
