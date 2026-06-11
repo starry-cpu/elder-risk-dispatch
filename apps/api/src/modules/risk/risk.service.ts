@@ -46,7 +46,7 @@ export class RiskService {
       recentHighRisk = !!recent;
     }
 
-    const result = this.scoring.evaluate({
+    const result = await this.scoring.evaluate({
       hoursSinceLastCheckIn: input.hoursSinceLastCheckIn ?? 0,
       deviceAlarms: input.deviceAlarms ?? [],
       abnormalText: input.abnormalText ?? false,
