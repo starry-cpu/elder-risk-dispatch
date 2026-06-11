@@ -27,11 +27,13 @@ export class AiService {
       { role: 'user', content: text },
     ]);
 
+    let parseOk = true;
     let parsed: { type: string; confidence: number; advice?: string };
     try {
       parsed = JSON.parse(response);
     } catch {
       parsed = { type: 'LIFE', confidence: 0.3 };
+      parseOk = false;
     }
 
     // Compliance check on output
@@ -50,7 +52,7 @@ export class AiService {
     return {
       type: parsed.type ?? 'LIFE',
       confidence: parsed.confidence ?? 0.5,
-      needsHumanReview: (parsed.confidence ?? 0.5) < 0.6,
+      needsHumanReview: parseOk && (parsed.confidence ?? 0.5) < 0.6,
     };
   }
 

@@ -51,6 +51,16 @@ describe('AiService', () => {
       await expect(service.classify('建议服用降压药')).rejects.toThrow('医疗诊断');
     });
 
+    it('JSON 解析失败时应 fallback 为 LIFE 且不标记 needsHumanReview', async () => {
+      mockAiClient.chat.mockResolvedValue('not valid json');
+      mockPrisma.aiInferenceLog.create.mockResolvedValue({ id: 'log-fallback' });
+
+      const result = await service.classify('一些文本');
+      expect(result.type).toBe('LIFE');
+      expect(result.confidence).toBe(0.3);
+      expect(result.needsHumanReview).toBe(false);
+    });
+
     it('应拦截诊断/治疗类 AI 输出', async () => {
       mockAiClient.chat.mockResolvedValue('{"type":"HEALTH","confidence":0.9,"advice":"建议进行心电图检查"}');
       mockPrisma.aiInferenceLog.create.mockResolvedValue({ id: 'log-3' });
@@ -110,6 +120,11 @@ describe('isAbnormalTextResult', () => {
 
   it('needsHumanReview=false + non-HEALTH + high confidence should NOT be abnormal', () => {
     const result = isAbnormalTextResult({ type: 'COMPANION', confidence: 0.88, needsHumanReview: false });
+    expect(result).toBe(false);
+  });
+
+  it('JSON parse fallback (LIFE + low confidence + needsHumanReview=false) should NOT be abnormal', () => {
+    const result = isAbnormalTextResult({ type: 'LIFE', confidence: 0.3, needsHumanReview: false });
     expect(result).toBe(false);
   });
 });
