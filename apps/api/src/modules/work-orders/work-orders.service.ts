@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DispatchRecommendationService } from '../risk/dispatch-recommendation.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { WorkOrderStateMachine } from './work-orders.state-machine';
 import { WorkOrderType, WorkOrderStatus, RiskStatus, Role, RiskLevel } from '@prisma/client';
 
@@ -34,10 +35,35 @@ function checkDistrictAccess(wo: { elder: { district: string } }, requester: Req
 
 @Injectable()
 export class WorkOrdersService {
+  private readonly logger = new Logger(WorkOrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatch: DispatchRecommendationService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  private pushWorkOrderUpdate(workOrderId: string, status: string, type: string, elderId: string, assigneeId?: string | null) {
+    const payload = { workOrderId, status, type, elderId };
+
+    // Notify the assignee
+    if (assigneeId) {
+      this.notificationsService.emitAndPersist({
+        event: 'workorder:update',
+        roomType: 'user',
+        roomId: assigneeId,
+        payload,
+      }).catch(() => { /* ignore */ });
+    }
+
+    // Notify ADMIN role
+    this.notificationsService.emitAndPersist({
+      event: 'workorder:update',
+      roomType: 'role',
+      roomId: 'ADMIN',
+      payload,
+    }).catch(() => { /* ignore */ });
+  }
 
   async create(
     input: {
@@ -222,6 +248,8 @@ export class WorkOrdersService {
       },
     });
 
+    this.pushWorkOrderUpdate(updated.id, updated.status, updated.type, updated.elderId, assigneeId);
+
     return updated;
   }
 
@@ -291,6 +319,8 @@ export class WorkOrdersService {
       },
     });
 
+    this.pushWorkOrderUpdate(updated.id, updated.status, updated.type, updated.elderId, updated.assigneeId);
+
     return updated;
   }
 
@@ -332,6 +362,8 @@ export class WorkOrdersService {
         note: reason ?? null,
       },
     });
+
+    this.pushWorkOrderUpdate(updated.id, updated.status, updated.type, updated.elderId, updated.assigneeId);
 
     return updated;
   }
