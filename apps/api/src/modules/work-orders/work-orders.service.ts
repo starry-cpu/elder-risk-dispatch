@@ -12,6 +12,18 @@ export interface Requester {
 
 const ASSIGNABLE_ROLES: Role[] = [Role.GRID_WORKER, Role.COMMUNITY_DOCTOR, Role.PROPERTY, Role.VOLUNTEER];
 
+function safeTransition(
+  from: WorkOrderStatus,
+  to: WorkOrderStatus,
+  context: { isAssignee?: boolean; hasReason?: boolean } = {},
+): WorkOrderStatus {
+  try {
+    return WorkOrderStateMachine.transition(from, to, context);
+  } catch (e: any) {
+    throw new BadRequestException(e.message ?? '非法的状态转移');
+  }
+}
+
 function checkDistrictAccess(wo: { elder: { district: string } }, requester: Requester): void {
   if (
     requester.role !== Role.ADMIN &&
@@ -177,7 +189,7 @@ export class WorkOrdersService {
       throw new BadRequestException('不可将工单派给该角色');
     }
 
-    WorkOrderStateMachine.transition(wo.status, WorkOrderStatus.ASSIGNED, {
+    safeTransition(wo.status, WorkOrderStatus.ASSIGNED, {
       isAssignee: true,
     });
 
@@ -206,7 +218,7 @@ export class WorkOrdersService {
     if (!wo) throw new NotFoundException('工单不存在');
     checkDistrictAccess(wo, requester);
 
-    WorkOrderStateMachine.transition(wo.status, WorkOrderStatus.IN_PROGRESS, {
+    safeTransition(wo.status, WorkOrderStatus.IN_PROGRESS, {
       isAssignee: wo.assigneeId === requester.sub,
     });
 
@@ -242,7 +254,7 @@ export class WorkOrdersService {
       throw new ForbiddenException('只有接单人员可以完成工单');
     }
 
-    WorkOrderStateMachine.transition(wo.status, WorkOrderStatus.COMPLETED, {});
+    safeTransition(wo.status, WorkOrderStatus.COMPLETED, {});
 
     const updated = await this.prisma.workOrder.update({
       where: { id },
@@ -276,7 +288,7 @@ export class WorkOrdersService {
     const hasReason = reason !== undefined && reason.trim().length > 0;
 
     // For IN_PROGRESS, the state machine already requires hasReason
-    WorkOrderStateMachine.transition(wo.status, WorkOrderStatus.CANCELLED, {
+    safeTransition(wo.status, WorkOrderStatus.CANCELLED, {
       isAssignee: wo.assigneeId === requester.sub,
       hasReason,
     });
@@ -319,7 +331,7 @@ export class WorkOrdersService {
       throw new BadRequestException('不可将工单派给该角色');
     }
 
-    WorkOrderStateMachine.transition(wo.status, WorkOrderStatus.ASSIGNED, {
+    safeTransition(wo.status, WorkOrderStatus.ASSIGNED, {
       hasReason: true,
     });
 

@@ -214,7 +214,7 @@ describe('WorkOrders E2E', () => {
         .post(`/api/v1/work-orders/${workOrderId}/assign`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ assigneeId: other.id })
-        .expect(500); // State machine throws plain Error → 500
+        .expect(400); // BadRequestException from state machine guard
 
       expect(response.body.code).toBe(500);
     });
@@ -234,7 +234,7 @@ describe('WorkOrders E2E', () => {
       await request(app.getHttpServer())
         .post(`/api/v1/work-orders/${workOrderId}/start`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(500); // State machine throws plain Error
+        .expect(400); // BadRequestException: 只有接单人员可以开始处理
     });
   });
 
