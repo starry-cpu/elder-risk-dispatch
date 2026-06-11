@@ -48,7 +48,7 @@ describe('Scheduler & Notifications E2E', () => {
     const adminPasswordHash = await bcrypt.hash('admin123', 10);
     await prisma.user.create({
       data: {
-        id: 'admin-e2e',
+        id: 'admin-e2e-sched',
         name: '管理员',
         role: Role.ADMIN,
         phone: adminPhoneEncrypted,
