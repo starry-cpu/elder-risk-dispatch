@@ -30,8 +30,8 @@ export class RiskController {
 
   @Get('risk/events/:id')
   @ApiOperation({ summary: '查看风险事件详情' })
-  findById(@Param('id') id: string) {
-    return this.riskService.findById(id);
+  findById(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.riskService.findById(id, user);
   }
 
   @Post('risk/events/:id/review')

@@ -1,10 +1,13 @@
 // apps/api/src/modules/ai/ai.controller.ts
 import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import { AiService } from './ai.service';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('AI')
 @ApiBearerAuth()
+@Roles(Role.ADMIN, Role.GRID_WORKER)
 @Controller()
 export class AiController {
   constructor(private readonly aiService: AiService) {}

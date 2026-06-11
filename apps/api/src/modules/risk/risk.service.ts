@@ -109,7 +109,7 @@ export class RiskService {
     return { items, total, page, limit };
   }
 
-  async findById(id: string) {
+  async findById(id: string, requester?: Requester) {
     const event = await this.prisma.riskEvent.findUnique({
       where: { id },
       include: {
@@ -118,6 +118,12 @@ export class RiskService {
       },
     });
     if (!event) throw new NotFoundException('风险事件不存在');
+
+    // District isolation: non-ADMIN limited to own district
+    if (requester && requester.role !== Role.ADMIN && requester.district && event.elder.district !== requester.district) {
+      throw new NotFoundException('风险事件不存在');
+    }
+
     return event;
   }
 
