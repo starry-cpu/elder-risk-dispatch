@@ -1,5 +1,5 @@
 export class GridWorkerPerformanceDto {
-  workers: Array<{
+  workers!: Array<{
     userId: string;
     name: string;
     role: string;
