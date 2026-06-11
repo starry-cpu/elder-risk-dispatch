@@ -155,9 +155,27 @@ describe('WorkOrderStateMachine', () => {
       expect(result.allowed).toBe(false);
     });
 
-    // === transition method ===
+    it('PENDING → PENDING is not allowed', () => {
+      const result = WorkOrderStateMachine.canTransition(
+        WorkOrderStatus.PENDING,
+        WorkOrderStatus.PENDING,
+        {},
+      );
+      expect(result.allowed).toBe(false);
+    });
 
-    it('transition returns new status for valid transitions', () => {
+    it('IN_PROGRESS → IN_PROGRESS is not allowed', () => {
+      const result = WorkOrderStateMachine.canTransition(
+        WorkOrderStatus.IN_PROGRESS,
+        WorkOrderStatus.IN_PROGRESS,
+        {},
+      );
+      expect(result.allowed).toBe(false);
+    });
+  });
+
+  describe('transition', () => {
+    it('returns new status for valid transitions', () => {
       const result = WorkOrderStateMachine.transition(
         WorkOrderStatus.PENDING,
         WorkOrderStatus.CANCELLED,
@@ -166,7 +184,7 @@ describe('WorkOrderStateMachine', () => {
       expect(result).toBe(WorkOrderStatus.CANCELLED);
     });
 
-    it('transition throws for invalid transitions', () => {
+    it('throws for invalid transitions', () => {
       expect(() =>
         WorkOrderStateMachine.transition(WorkOrderStatus.COMPLETED, WorkOrderStatus.PENDING, {}),
       ).toThrow();
