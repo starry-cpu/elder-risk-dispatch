@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CheckInsService } from './check-ins.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { Role, CheckInMethod } from '@prisma/client';
+import { AiService } from '../ai/ai.service';
+import { RiskService } from '../risk/risk.service';
 
 describe('CheckInsService', () => {
   let service: CheckInsService;
@@ -29,11 +31,21 @@ describe('CheckInsService', () => {
     },
   };
 
+  const mockAiService = {
+    classify: jest.fn(),
+  };
+
+  const mockRiskService = {
+    evaluateAndCreateEvent: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CheckInsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: AiService, useValue: mockAiService },
+        { provide: RiskService, useValue: mockRiskService },
       ],
     }).compile();
     service = module.get<CheckInsService>(CheckInsService);
@@ -152,6 +164,118 @@ describe('CheckInsService', () => {
       await expect(
         service.create({ elderId: 'elder-1', method: CheckInMethod.PROXY }, worker),
       ).rejects.toThrow('备注说明');
+    });
+
+    // ========== AI abnormal text detection integration tests ==========
+
+    // Helper: flush pending microtasks for fire-and-forget detection
+    const flushPromises = () => new Promise(resolve => setImmediate(resolve));
+
+    it('normal text (ERRAND high confidence) should NOT trigger risk event', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.create.mockResolvedValue({
+        id: 'ci-ai-1', elderId: 'elder-1', method: 'TEXT',
+        content: '需要买米', voiceUrl: null, status: 'NORMAL', createdAt: new Date(),
+      });
+      mockAiService.classify.mockResolvedValue({
+        type: 'ERRAND', confidence: 0.92, needsHumanReview: false,
+      });
+
+      const result = await service.create(
+        { elderId: 'elder-1', method: CheckInMethod.TEXT, content: '需要买米' },
+        familyUser,
+      );
+      await flushPromises();
+
+      expect(result).toBeDefined();
+      expect(mockAiService.classify).toHaveBeenCalledWith('需要买米');
+      expect(mockRiskService.evaluateAndCreateEvent).not.toHaveBeenCalled();
+    });
+
+    it('HEALTH high confidence text should trigger ABNORMAL_TEXT risk event', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.create.mockResolvedValue({
+        id: 'ci-ai-2', elderId: 'elder-1', method: 'TEXT',
+        content: '我头晕需要帮助', voiceUrl: null, status: 'NORMAL', createdAt: new Date(),
+      });
+      mockAiService.classify.mockResolvedValue({
+        type: 'HEALTH', confidence: 0.88, needsHumanReview: false,
+      });
+
+      const result = await service.create(
+        { elderId: 'elder-1', method: CheckInMethod.TEXT, content: '我头晕需要帮助' },
+        familyUser,
+      );
+      await flushPromises();
+
+      expect(result).toBeDefined();
+      expect(mockAiService.classify).toHaveBeenCalledWith('我头晕需要帮助');
+      expect(mockRiskService.evaluateAndCreateEvent).toHaveBeenCalledWith({
+        elderId: 'elder-1',
+        abnormalText: true,
+      });
+    });
+
+    it('low confidence (needsHumanReview=true) should trigger risk event', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.create.mockResolvedValue({
+        id: 'ci-ai-3', elderId: 'elder-1', method: 'TEXT',
+        content: '不太清楚...嗯...那个...', voiceUrl: null, status: 'NORMAL', createdAt: new Date(),
+      });
+      mockAiService.classify.mockResolvedValue({
+        type: 'LIFE', confidence: 0.35, needsHumanReview: true,
+      });
+
+      const result = await service.create(
+        { elderId: 'elder-1', method: CheckInMethod.TEXT, content: '不太清楚...嗯...那个...' },
+        familyUser,
+      );
+      await flushPromises();
+
+      expect(result).toBeDefined();
+      expect(mockRiskService.evaluateAndCreateEvent).toHaveBeenCalledWith({
+        elderId: 'elder-1',
+        abnormalText: true,
+      });
+    });
+
+    it('AI classification failure should silently degrade, not block CheckIn creation', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.create.mockResolvedValue({
+        id: 'ci-ai-4', elderId: 'elder-1', method: 'TEXT',
+        content: '需要帮助', voiceUrl: null, status: 'NORMAL', createdAt: new Date(),
+      });
+      mockAiService.classify.mockRejectedValue(new Error('AI service unavailable'));
+
+      // should NOT throw
+      const result = await service.create(
+        { elderId: 'elder-1', method: CheckInMethod.TEXT, content: '需要帮助' },
+        familyUser,
+      );
+      await flushPromises();
+
+      expect(result).toBeDefined();
+      expect(result.method).toBe('TEXT');
+      // AI unavailable should NOT trigger risk event
+      expect(mockRiskService.evaluateAndCreateEvent).not.toHaveBeenCalled();
+    });
+
+    it('ONE_TAP method (no text content) should NOT call AI classification', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.create.mockResolvedValue({
+        id: 'ci-ai-5', elderId: 'elder-1', method: 'ONE_TAP',
+        content: null, voiceUrl: null, status: 'NORMAL', createdAt: new Date(),
+      });
+
+      const result = await service.create(
+        { elderId: 'elder-1', method: CheckInMethod.ONE_TAP },
+        familyUser,
+      );
+      await flushPromises();
+
+      expect(result).toBeDefined();
+      expect(mockAiService.classify).not.toHaveBeenCalled();
+      expect(mockRiskService.evaluateAndCreateEvent).not.toHaveBeenCalled();
     });
   });
 

@@ -27,11 +27,13 @@ export class AiService {
       { role: 'user', content: text },
     ]);
 
+    let parseOk = true;
     let parsed: { type: string; confidence: number; advice?: string };
     try {
       parsed = JSON.parse(response);
     } catch {
       parsed = { type: 'LIFE', confidence: 0.3 };
+      parseOk = false;
     }
 
     // Compliance check on output
@@ -50,7 +52,7 @@ export class AiService {
     return {
       type: parsed.type ?? 'LIFE',
       confidence: parsed.confidence ?? 0.5,
-      needsHumanReview: (parsed.confidence ?? 0.5) < 0.6,
+      needsHumanReview: parseOk && (parsed.confidence ?? 0.5) < 0.6,
     };
   }
 
@@ -95,4 +97,22 @@ export class AiService {
       }
     }
   }
+}
+
+/**
+ * Determines whether an AI classification result represents "abnormal text".
+ * Pure function — no external dependencies, easy to unit test and reuse.
+ *
+ * Abnormal detection rules:
+ * - HEALTH type + confidence ≥ 0.7 → elder actively expressing health concerns
+ * - needsHumanReview === true (confidence < 0.6) → text is ambiguous, possible cognitive anomaly
+ */
+export function isAbnormalTextResult(result: {
+  type: string;
+  confidence: number;
+  needsHumanReview: boolean;
+}): boolean {
+  if (result.type === 'HEALTH' && result.confidence >= 0.7) return true;
+  if (result.needsHumanReview) return true;
+  return false;
 }

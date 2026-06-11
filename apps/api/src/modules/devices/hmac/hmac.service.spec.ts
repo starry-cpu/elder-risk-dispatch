@@ -74,15 +74,19 @@ describe('HmacService', () => {
     });
 
     it('should accept timestamp exactly at boundary (+5 min)', () => {
+      const now = 1700000000000;
+      jest.spyOn(Date, 'now').mockReturnValue(now);
       const payload = { test: true };
-      const boundaryTimestamp = Date.now() + 5 * 60 * 1000;
+      const boundaryTimestamp = now + 5 * 60 * 1000;
       const signature = service.sign(payload, boundaryTimestamp);
       expect(service.verify('dev-1', payload, signature, boundaryTimestamp)).toBe(true);
     });
 
     it('should accept timestamp exactly at boundary (-5 min)', () => {
+      const now = 1700000000000;
+      jest.spyOn(Date, 'now').mockReturnValue(now);
       const payload = { test: true };
-      const boundaryTimestamp = Date.now() - 5 * 60 * 1000;
+      const boundaryTimestamp = now - 5 * 60 * 1000;
       const signature = service.sign(payload, boundaryTimestamp);
       expect(service.verify('dev-1', payload, signature, boundaryTimestamp)).toBe(true);
     });
