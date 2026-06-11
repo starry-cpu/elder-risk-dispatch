@@ -6,6 +6,7 @@ import { AdminLoginDto } from './dto/admin-login.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from './strategies/jwt.strategy';
+import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -22,6 +23,7 @@ export class AuthController {
   @Public()
   @Post('admin-login')
   @ApiOperation({ summary: '后台管理端登录' })
+  @Auditable('AUTH', 'LOGIN', { logRequestBody: true, sensitiveFields: ['password'] })
   adminLogin(@Body() dto: AdminLoginDto) {
     return this.authService.adminLogin(dto);
   }
