@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { Role, CheckInMethod } from '@prisma/client';
+import { AiService, isAbnormalTextResult } from '../ai/ai.service';
+import { RiskService } from '../risk/risk.service';
 
 interface Requester {
   sub: string;
@@ -15,7 +17,11 @@ interface Requester {
 
 @Injectable()
 export class CheckInsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiService: AiService,
+    private readonly riskService: RiskService,
+  ) {}
 
   async create(dto: { elderId: string; method: CheckInMethod; content?: string; voiceUrl?: string }, requester: Requester) {
     const elder = await this.prisma.elder.findUnique({
@@ -45,7 +51,7 @@ export class CheckInsService {
       }
     }
 
-    return this.prisma.checkIn.create({
+    const checkIn = await this.prisma.checkIn.create({
       data: {
         elderId: dto.elderId,
         method: dto.method,
@@ -54,6 +60,13 @@ export class CheckInsService {
         status: 'NORMAL',
       },
     });
+
+    // Fire-and-forget: AI abnormal text detection does not block CheckIn response
+    if (dto.content && (dto.method === CheckInMethod.TEXT || dto.method === CheckInMethod.PROXY)) {
+      this.detectAbnormalText(dto.elderId, dto.content);
+    }
+
+    return checkIn;
   }
 
   async findByElder(elderId: string, query: { page?: number; limit?: number }, requester: Requester) {
@@ -79,6 +92,22 @@ export class CheckInsService {
     ]);
 
     return { items, total, page, limit };
+  }
+
+  /**
+   * Asynchronously detect whether check-in text is abnormal.
+   * If abnormal, automatically generate a risk event.
+   * Silently degrades: AI unavailability does not block CheckIn creation.
+   */
+  private async detectAbnormalText(elderId: string, content: string): Promise<void> {
+    try {
+      const result = await this.aiService.classify(content);
+      if (isAbnormalTextResult(result)) {
+        await this.riskService.evaluateAndCreateEvent({ elderId, abnormalText: true });
+      }
+    } catch {
+      // Silent degradation: AI service unavailable or compliance interception hit, do not block main flow
+    }
   }
 
   private authorizeAccess(elder: any, requester: Requester) {
