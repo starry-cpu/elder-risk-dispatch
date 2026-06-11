@@ -1,0 +1,31 @@
+{
+  "pages": [{ "path": "pages/index/index", "style": { "navigationBarTitleText": "照护调度" } }],
+  "subPackages": [
+    {
+      "root": "pagesElder",
+      "pages": [
+        { "path": "check-in/index", "style": { "navigationBarTitleText": "一键报平安" } },
+        { "path": "sos/index", "style": { "navigationBarTitleText": "语音求助" } },
+        { "path": "order-progress/index", "style": { "navigationBarTitleText": "工单进度" } }
+      ]
+    },
+    {
+      "root": "pagesWorker",
+      "pages": [
+        { "path": "risk-tasks/index", "style": { "navigationBarTitleText": "风险待办" } },
+        { "path": "risk-tasks/review", "style": { "navigationBarTitleText": "风险复核" } },
+        { "path": "visit-form/index", "style": { "navigationBarTitleText": "巡访记录" } },
+        { "path": "visit-form/records", "style": { "navigationBarTitleText": "巡访历史" } },
+        { "path": "work-order/list", "style": { "navigationBarTitleText": "工单列表" } },
+        { "path": "work-order/detail", "style": { "navigationBarTitleText": "工单详情" } },
+        { "path": "verification/index", "style": { "navigationBarTitleText": "电话核实" } }
+      ]
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "照护调度",
+    "navigationBarBackgroundColor": "#F8F8F8",
+    "backgroundColor": "#F8F8F8"
+  }
+}

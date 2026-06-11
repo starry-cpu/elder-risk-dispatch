@@ -1,0 +1,14 @@
+{
+  "name": "照护调度",
+  "appid": "__UNI__CARE",
+  "description": "社区独居老人照护风险预警与服务调度",
+  "versionName": "0.1.0",
+  "versionCode": 1,
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": { "urlCheck": false, "es6": true, "postcss": true, "minified": true },
+    "usingComponents": true,
+    "optimization": { "subPackages": true }
+  }
+}
