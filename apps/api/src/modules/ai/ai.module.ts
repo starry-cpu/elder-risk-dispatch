@@ -1,7 +1,9 @@
 // apps/api/src/modules/ai/ai.module.ts
 import { Module } from '@nestjs/common';
 import OpenAI from 'openai';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import { AiClient, OPENAI_CLIENT } from './ai-client.service';
+import { AiService } from './ai.service';
 
 @Module({
   providers: [
@@ -15,7 +17,9 @@ import { AiClient, OPENAI_CLIENT } from './ai-client.service';
       },
     },
     AiClient,
+    AiService,
+    PrismaService,
   ],
-  exports: [AiClient],
+  exports: [AiClient, AiService],
 })
 export class AiModule {}
