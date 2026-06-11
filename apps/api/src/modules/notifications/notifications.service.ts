@@ -18,12 +18,25 @@ interface QueryInput {
   limit: number;
 }
 
+interface EmitInput {
+  event: string;
+  roomType: 'user' | 'role' | 'district';
+  roomId: string;
+  payload: Record<string, unknown>;
+}
+
 @Injectable()
 export class NotificationsService {
+  private gateway: { emitToUser: Function; emitToRole: Function; emitToDistrict: Function } | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('notifications') private readonly notificationsQueue: Queue,
   ) {}
+
+  setGateway(gateway: { emitToUser: Function; emitToRole: Function; emitToDistrict: Function }): void {
+    this.gateway = gateway;
+  }
 
   async send(input: SendInput) {
     const notification = await this.prisma.notification.create({
@@ -75,5 +88,79 @@ export class NotificationsService {
     ]);
 
     return { items, total, page, limit };
+  }
+
+  async emitAndPersist(input: EmitInput) {
+    const { event, roomType, roomId, payload } = input;
+
+    const notification = await this.prisma.notification.create({
+      data: {
+        targetType: roomType === 'user' ? 'USER' : 'SYSTEM',
+        targetId: roomId,
+        channel: 'websocket',
+        templateId: null,
+        payload: { event, ...payload } as any,
+        status: 'SENT',
+        sentAt: new Date(),
+      },
+    });
+
+    try {
+      if (this.gateway) {
+        switch (roomType) {
+          case 'user':
+            this.gateway.emitToUser(roomId, event, payload);
+            break;
+          case 'role':
+            this.gateway.emitToRole(roomId, event, payload);
+            break;
+          case 'district':
+            this.gateway.emitToDistrict(roomId, event, payload);
+            break;
+        }
+      }
+    } catch {
+      // WS 推送失败不影响落盘
+    }
+
+    return notification;
+  }
+
+  async getInbox(input: { userId: string; page: number; limit: number; includeRead?: boolean }) {
+    const { userId, page, limit, includeRead } = input;
+    const skip = (page - 1) * limit;
+
+    const where: Record<string, unknown> = {
+      targetType: 'USER',
+      targetId: userId,
+    };
+    if (!includeRead) {
+      where.readAt = null;
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.notification.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
+  }
+
+  async markAsRead(notificationId: string, userId: string): Promise<void> {
+    await this.prisma.notification.update({
+      where: { id: notificationId, targetType: 'USER', targetId: userId },
+      data: { readAt: new Date() },
+    });
+  }
+
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.prisma.notification.count({
+      where: { targetType: 'USER', targetId: userId, readAt: null },
+    });
   }
 }

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min } from 'class-validator';
+import { IsOptional, IsString, IsInt, IsBoolean, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class NotificationQueryDto {
@@ -21,4 +21,9 @@ export class NotificationQueryDto {
   @Min(1)
   @IsOptional()
   limit?: number = 20;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeRead?: boolean = false;
 }
