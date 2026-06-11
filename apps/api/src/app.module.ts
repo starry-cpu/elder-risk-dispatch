@@ -12,6 +12,7 @@ import { VisitsModule } from './modules/visits/visits.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { RiskModule } from './modules/risk/risk.module';
 import { AiModule } from './modules/ai/ai.module';
+import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -29,6 +30,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     DevicesModule,
     RiskModule,
     AiModule,
+    WorkOrdersModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
