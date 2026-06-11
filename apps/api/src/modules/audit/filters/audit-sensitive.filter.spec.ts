@@ -44,4 +44,33 @@ describe('sanitizeAuditData', () => {
     expect(sanitizeAuditData({}, [])).toEqual({});
     expect(sanitizeAuditData({ name: 'test' }, [])).toEqual({ name: 'test' });
   });
+
+  it('null 输入应返回 null 而不崩溃', () => {
+    expect(sanitizeAuditData(null as unknown as Record<string, unknown>, ['phone'])).toBeNull();
+  });
+
+  it('undefined 输入应返回 undefined', () => {
+    expect(sanitizeAuditData(undefined as unknown as Record<string, unknown>, ['phone'])).toBeUndefined();
+  });
+
+  it('数组中的对象字段也应脱敏', () => {
+    const result = sanitizeAuditData(
+      { items: [{ phone: '13812345678' }, { phone: '13987654321' }] },
+      ['phone'],
+    );
+    const items = result.items as Array<Record<string, unknown>>;
+    expect(items[0].phone).toBe('1*********8');
+    expect(items[1].phone).toBe('1*********1');
+  });
+
+  it('深层嵌套对象(3+层)中敏感字段也应脱敏', () => {
+    const result = sanitizeAuditData(
+      { level1: { level2: { level3: { idCard: '110101199001011234' } } } },
+      ['idCard'],
+    );
+    const level1 = result.level1 as Record<string, unknown>;
+    const level2 = level1.level2 as Record<string, unknown>;
+    const level3 = level2.level3 as Record<string, unknown>;
+    expect(level3.idCard).toBe('**************1234');
+  });
 });

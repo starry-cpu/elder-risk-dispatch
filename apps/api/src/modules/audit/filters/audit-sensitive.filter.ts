@@ -6,13 +6,17 @@ export function sanitizeAuditData(
   data: Record<string, unknown>,
   sensitiveFields: string[],
 ): Record<string, unknown> {
-  if (!data || typeof data !== 'object') return data;
+  if (data == null || typeof data !== 'object') return data;
   if (!sensitiveFields || sensitiveFields.length === 0) return data;
 
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (Array.isArray(value)) {
+      result[key] = value.map((item) =>
+        item && typeof item === 'object' ? sanitizeAuditData(item as Record<string, unknown>, sensitiveFields) : item
+      );
+    } else if (value && typeof value === 'object') {
       result[key] = sanitizeAuditData(value as Record<string, unknown>, sensitiveFields);
     } else if (isSensitiveField(key, sensitiveFields)) {
       result[key] = maskValue(key, value);
