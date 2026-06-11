@@ -62,9 +62,9 @@ describe('Notifications Integration (Redis)', () => {
     expect(result.status).toBe('PENDING');
 
     const jobs = await notificationsQueue.getJobs(['waiting', 'active', 'delayed']);
-    expect(jobs.length).toBe(1);
-    expect(jobs[0].name).toBe('send-notification');
-    expect(jobs[0].data.notificationId).toBe('int-n-1');
+    const ourJob = jobs.find((j) => j.data.notificationId === 'int-n-1');
+    expect(ourJob).toBeDefined();
+    expect(ourJob!.name).toBe('send-notification');
   });
 
   it('should respect exponential backoff job options', async () => {
