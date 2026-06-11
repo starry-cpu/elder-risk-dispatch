@@ -8,6 +8,7 @@ import { ReviewRiskEventDto } from './dto/review-risk-event.dto';
 import { QueryRiskEventsDto } from './dto/query-risk-events.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('Risk')
 @ApiBearerAuth()
@@ -37,6 +38,7 @@ export class RiskController {
   @Post('risk/events/:id/review')
   @Roles(Role.ADMIN, Role.GRID_WORKER, Role.COMMUNITY_DOCTOR)
   @ApiOperation({ summary: '复核风险事件（确认/忽略）' })
+  @Auditable('RISK', 'REVIEW', { resourceIdParam: 'id' })
   review(
     @Param('id') id: string,
     @Body() dto: ReviewRiskEventDto,

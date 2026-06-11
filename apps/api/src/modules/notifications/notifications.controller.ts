@@ -1,11 +1,12 @@
-import { Controller, Post, Get, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { SendNotificationDto } from './dto/send-notification.dto';
 import { NotificationQueryDto } from './dto/notification-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
 @ApiTags('Notifications')
@@ -35,5 +36,36 @@ export class NotificationsController {
       page: query.page ?? 1,
       limit: query.limit ?? 20,
     });
+  }
+
+  @Get('inbox')
+  @ApiOperation({ summary: '当前用户通知列表' })
+  async getInbox(
+    @Query() query: NotificationQueryDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.notificationsService.getInbox({
+      userId: user.sub,
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+      includeRead: query.includeRead ?? false,
+    });
+  }
+
+  @Post(':id/read')
+  @ApiOperation({ summary: '标记通知已读' })
+  async markAsRead(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    await this.notificationsService.markAsRead(id, user.sub);
+    return { success: true };
+  }
+
+  @Get('unread-count')
+  @ApiOperation({ summary: '未读通知计数' })
+  async getUnreadCount(@CurrentUser() user: any) {
+    const count = await this.notificationsService.getUnreadCount(user.sub);
+    return { count };
   }
 }

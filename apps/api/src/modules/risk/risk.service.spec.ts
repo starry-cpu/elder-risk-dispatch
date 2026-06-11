@@ -2,6 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RiskService } from './risk.service';
 import { RiskScoringService } from './risk-scoring.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RiskLevel, RiskStatus, Role, ServiceLevel } from '@prisma/client';
 
@@ -44,11 +45,16 @@ describe('RiskService', () => {
     $queryRaw: jest.fn(),
   };
 
+  const mockNotificationsService = {
+    emitAndPersist: jest.fn().mockResolvedValue({ id: 'notif-99' }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RiskService,
         { provide: RiskScoringService, useValue: mockScoringService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
         { provide: PrismaService, useValue: mockPrisma },
       ],
     }).compile();

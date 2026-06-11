@@ -9,6 +9,7 @@ import { CompleteWorkOrderDto } from './dto/complete-work-order.dto';
 import { ReassignWorkOrderDto } from './dto/reassign-work-order.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('WorkOrders')
 @ApiBearerAuth()
@@ -38,6 +39,7 @@ export class WorkOrdersController {
   @Post('work-orders/:id/assign')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '指定接单人员' })
+  @Auditable('WORK_ORDER', 'ASSIGN', { resourceIdParam: 'id' })
   assign(
     @Param('id') id: string,
     @Body() dto: AssignWorkOrderDto,
@@ -54,6 +56,7 @@ export class WorkOrdersController {
 
   @Post('work-orders/:id/complete')
   @ApiOperation({ summary: '接单者提交处理结果' })
+  @Auditable('WORK_ORDER', 'COMPLETE', { resourceIdParam: 'id' })
   complete(
     @Param('id') id: string,
     @Body() dto: CompleteWorkOrderDto,
@@ -64,6 +67,7 @@ export class WorkOrdersController {
 
   @Post('work-orders/:id/cancel')
   @ApiOperation({ summary: '取消工单' })
+  @Auditable('WORK_ORDER', 'CANCEL', { resourceIdParam: 'id' })
   cancel(
     @Param('id') id: string,
     @Body() dto: { reason?: string },

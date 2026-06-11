@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WorkOrdersService } from './work-orders.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { DispatchRecommendationService } from '../risk/dispatch-recommendation.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   WorkOrderType, WorkOrderStatus, RiskLevel, RiskStatus, Role, DutyStatus,
 } from '@prisma/client';
@@ -32,12 +33,17 @@ describe('WorkOrdersService', () => {
     recommend: jest.fn(),
   };
 
+  const mockNotificationsService = {
+    emitAndPersist: jest.fn().mockResolvedValue({ id: 'notif-99' }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkOrdersService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: DispatchRecommendationService, useValue: mockDispatch },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
 

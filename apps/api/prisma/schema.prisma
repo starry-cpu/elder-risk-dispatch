@@ -278,6 +278,8 @@ model AuditLog {
   createdAt    DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, createdAt])
 }
 
 model Notification {
@@ -289,6 +291,7 @@ model Notification {
   payload    Json
   status     String    @default("PENDING")
   sentAt     DateTime?
+  readAt     DateTime?
   createdAt  DateTime  @default(now())
 }
 

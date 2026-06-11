@@ -15,6 +15,7 @@ import { UpdateElderDto } from './dto/update-elder.dto';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('Elders')
 @ApiBearerAuth()
@@ -25,6 +26,7 @@ export class EldersController {
   @Post()
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '创建老人档案' })
+  @Auditable('ELDER', 'CREATE', { sensitiveFields: ['idCard', 'phone'] })
   create(@Body() dto: CreateElderDto, @CurrentUser() user: any) {
     return this.eldersService.create(dto, user);
   }
@@ -50,6 +52,7 @@ export class EldersController {
   @Patch(':id')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '更新老人档案' })
+  @Auditable('ELDER', 'UPDATE', { resourceIdParam: 'id', sensitiveFields: ['idCard', 'phone'] })
   update(@Param('id') id: string, @Body() dto: UpdateElderDto, @CurrentUser() user: any) {
     return this.eldersService.update(id, dto, user);
   }

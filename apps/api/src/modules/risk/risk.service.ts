@@ -1,9 +1,10 @@
 // apps/api/src/modules/risk/risk.service.ts
 import {
-  Injectable, NotFoundException, BadRequestException,
+  Injectable, NotFoundException, BadRequestException, Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RiskScoringService } from './risk-scoring.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RiskLevel, RiskStatus, RiskSource, Role } from '@prisma/client';
 
 interface Requester {
@@ -14,9 +15,12 @@ interface Requester {
 
 @Injectable()
 export class RiskService {
+  private readonly logger = new Logger(RiskService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly scoring: RiskScoringService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async evaluateAndCreateEvent(input: {
@@ -63,7 +67,7 @@ export class RiskService {
     if (input.deviceAlarms && input.deviceAlarms.length > 0) source = RiskSource.DEVICE;
     if (input.abnormalText) source = RiskSource.ABNORMAL_TEXT;
 
-    return this.prisma.riskEvent.create({
+    const event = await this.prisma.riskEvent.create({
       data: {
         elderId: input.elderId,
         level: result.level,
@@ -74,6 +78,45 @@ export class RiskService {
         ruleVersion: String(result.ruleVersion),
       },
     });
+
+    // Push WebSocket notification for HIGH risk events
+    if (event.level === RiskLevel.HIGH) {
+      // Notify ADMIN role
+      this.notificationsService.emitAndPersist({
+        event: 'risk:alert',
+        roomType: 'role',
+        roomId: 'ADMIN',
+        payload: {
+          riskEventId: event.id,
+          elderId: event.elderId,
+          level: event.level,
+          source: event.source,
+          reason: event.reason,
+        },
+      }).catch((err: unknown) => {
+        this.logger.warn(`WS push failed (risk:alert): ${err instanceof Error ? err.message : String(err)}`);
+      });
+
+      // Also notify the elder's district
+      if (elder.district) {
+        this.notificationsService.emitAndPersist({
+          event: 'risk:alert',
+          roomType: 'district',
+          roomId: elder.district,
+          payload: {
+            riskEventId: event.id,
+            elderId: event.elderId,
+            level: event.level,
+            source: event.source,
+            reason: event.reason,
+          },
+        }).catch((err: unknown) => {
+        this.logger.warn(`WS push failed (risk:alert): ${err instanceof Error ? err.message : String(err)}`);
+      });
+      }
+    }
+
+    return event;
   }
 
   async findAll(

@@ -6,6 +6,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -36,6 +37,7 @@ export class UsersController {
   @Patch(':id')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: '更新用户信息' })
+  @Auditable('USER', 'ROLE_CHANGE', { resourceIdParam: 'id', sensitiveFields: ['phone'] })
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
   }

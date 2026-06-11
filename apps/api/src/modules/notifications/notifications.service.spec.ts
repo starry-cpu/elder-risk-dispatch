@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -9,7 +10,7 @@ describe('NotificationsService', () => {
 
   const mockQueue = { add: jest.fn() };
   const mockPrisma = {
-    notification: { create: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+    notification: { create: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -96,6 +97,116 @@ describe('NotificationsService', () => {
         skip: 0,
         take: 10,
         orderBy: { createdAt: 'desc' },
+      });
+    });
+  });
+
+  describe('emitAndPersist', () => {
+    it('应写入 Notification 表', async () => {
+      const notificationRecord = {
+        id: 'notif-2',
+        targetType: 'SYSTEM',
+        targetId: 'ADMIN',
+        channel: 'websocket',
+        templateId: null,
+        payload: { event: 'risk:alert', level: 'HIGH', elderId: 'e-1' },
+        status: 'SENT',
+        sentAt: new Date(),
+        readAt: null,
+        createdAt: new Date(),
+      };
+      mockPrisma.notification.create.mockResolvedValue(notificationRecord);
+
+      const result = await service.emitAndPersist({
+        event: 'risk:alert',
+        roomType: 'role',
+        roomId: 'ADMIN',
+        payload: { level: 'HIGH', elderId: 'e-1' },
+      });
+
+      expect(mockPrisma.notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          channel: 'websocket',
+          payload: expect.objectContaining({
+            event: 'risk:alert',
+            level: 'HIGH',
+            elderId: 'e-1',
+          }),
+          status: 'SENT',
+          sentAt: expect.any(Date),
+        }),
+      });
+      expect(result.id).toBe('notif-2');
+    });
+  });
+
+  describe('getInbox', () => {
+    it('应返回当前用户的未读/已读通知', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([
+        { id: 'n-1', targetType: 'USER', targetId: 'u-1', status: 'SENT', readAt: null, createdAt: new Date() },
+      ]);
+      mockPrisma.notification.count.mockResolvedValue(1);
+
+      const result = await service.getInbox({ userId: 'u-1', page: 1, limit: 20, includeRead: true });
+
+      expect(result.items).toHaveLength(1);
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith({
+        where: { targetType: 'USER', targetId: 'u-1' },
+        skip: 0,
+        take: 20,
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+
+    it('includeRead=false 时应过滤已读', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+      mockPrisma.notification.count.mockResolvedValue(0);
+
+      await service.getInbox({ userId: 'u-1', page: 1, limit: 20, includeRead: false });
+
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith({
+        where: { targetType: 'USER', targetId: 'u-1', readAt: null },
+        skip: 0,
+        take: 20,
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+  });
+
+  describe('markAsRead', () => {
+    it('应更新通知的 readAt 字段', async () => {
+      mockPrisma.notification.update.mockResolvedValue({
+        id: 'n-1', readAt: new Date(),
+      });
+
+      await service.markAsRead('n-1', 'u-1');
+
+      expect(mockPrisma.notification.update).toHaveBeenCalledWith({
+        where: { id: 'n-1', targetType: 'USER', targetId: 'u-1' },
+        data: { readAt: expect.any(Date) },
+      });
+    });
+
+    it('通知不存在或不属于用户时应抛出 NotFoundException', async () => {
+      const prismaError = new Error('Record not found') as Error & { code: string };
+      prismaError.code = 'P2025';
+      mockPrisma.notification.update.mockRejectedValue(prismaError);
+
+      await expect(
+        service.markAsRead('n-999', 'u-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getUnreadCount', () => {
+    it('应返回未读通知数量', async () => {
+      mockPrisma.notification.count.mockResolvedValue(5);
+
+      const result = await service.getUnreadCount('u-1');
+
+      expect(result).toBe(5);
+      expect(mockPrisma.notification.count).toHaveBeenCalledWith({
+        where: { targetType: 'USER', targetId: 'u-1', readAt: null },
       });
     });
   });
