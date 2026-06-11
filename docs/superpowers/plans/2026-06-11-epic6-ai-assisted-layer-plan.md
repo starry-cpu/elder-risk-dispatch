@@ -4,7 +4,7 @@
 
 **Goal:** 将 AI 文本分类能力接入 CheckIn → Risk 流程，实现"报平安文本自动异常检测 → 风险事件生成"闭环。
 
-**Architecture:** CheckInModule 导入 AiModule + RiskModule，CheckInsService 在创建 TEXT/PROXY 报平安后以 fire-and-forget 方式调用 `AiService.classify()`，通过纯函数 `isAbnormalTextResult()` 判定异常，若异常则调用 `RiskService.evaluateAndCreateEvent({ abnormalText: true })` 生成 ABNORMAL_TEXT 来源的 RiskEvent。
+**Architecture:** CheckInsModule 导入 AiModule + RiskModule，CheckInsService 在创建 TEXT/PROXY 报平安后以 fire-and-forget 方式调用 `AiService.classify()`，通过纯函数 `isAbnormalTextResult()` 判定异常，若异常则调用 `RiskService.evaluateAndCreateEvent({ abnormalText: true })` 生成 ABNORMAL_TEXT 来源的 RiskEvent。
 
 **Tech Stack:** NestJS 11.x, Prisma 6.x, Jest 29.x, TypeScript 5.7.x
 

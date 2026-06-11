@@ -17,10 +17,10 @@ Epic 6 的 AI 辅助层基础设施（AiClient 封装、classify/summarize 接�
 
 ### 3.1 模块依赖
 
-CheckInModule 直接导入 AiModule 和 RiskModule，注入对应 Service：
+CheckInsModule 直接导入 AiModule 和 RiskModule，注入对应 Service：
 
 ```
-CheckInModule
+CheckInsModule
   ├── imports: [AiModule, RiskModule]
   └── CheckInsService
         ├── AiService.classify(text)    → 文本异常分类
@@ -28,7 +28,7 @@ CheckInModule
                                        → 生成风险事件
 ```
 
-**无循环依赖**：依赖方向为 CheckIn → Ai、CheckIn → Risk，单向无环。NestJS 的模块系统原生支持同一 Module 被多处 import（AiModule/RiskModule 已在 AppModule 中 import，再被 CheckInModule import 不会导致重复实例化）。
+**无循环依赖**：依赖方向为 CheckIn → Ai、CheckIn → Risk，单向无环。NestJS 的模块系统原生支持同一 Module 被多处 import（AiModule/RiskModule 已在 AppModule 中 import，再被 CheckInsModule import 不会导致重复实例化）。
 
 ### 3.2 同步 vs 异步
 
@@ -102,7 +102,7 @@ POST /api/v1/check-ins
 | `modules/check-ins/check-ins.module.ts` | 修改 | imports 增加 `AiModule`, `RiskModule` |
 | `modules/check-ins/check-ins.service.ts` | 修改 | 注入 `AiService`, `RiskService`；`create()` 末尾追加异常检测逻辑 |
 | `modules/check-ins/check-ins.service.spec.ts` | 修改 | 补充 4 个 AI 集成场景单测 |
-| `modules/check-ins/check-ins.e2e-spec.ts` | 修改 | 补充 ABORMAL_TEXT 全链路 E2E（可选，视现有 E2E 结构而定）|
+| `modules/check-ins/check-ins.e2e-spec.ts` | 修改 | 补充 ABNORMAL_TEXT 全链路 E2E（可选，视现有 E2E 结构而定）|
 
 ## 8. 测试策略
 
