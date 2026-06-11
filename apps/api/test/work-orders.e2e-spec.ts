@@ -4,6 +4,7 @@ import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
+import { FieldEncryptionService } from '../src/common/crypto/field-encryption.service';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from '../src/common/interceptors/response.interceptor';
 import { Role, WorkOrderType, DutyStatus } from '@prisma/client';
@@ -11,6 +12,7 @@ import { Role, WorkOrderType, DutyStatus } from '@prisma/client';
 describe('WorkOrders E2E', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let cryptoService: FieldEncryptionService;
   let adminToken: string;
   let workerToken: string;
   let elderId: string;
@@ -29,6 +31,7 @@ describe('WorkOrders E2E', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    cryptoService = app.get(FieldEncryptionService);
 
     // Clean up any leftover test data
     await prisma.serviceEvaluation.deleteMany();
@@ -48,15 +51,19 @@ describe('WorkOrders E2E', () => {
     });
     elderId = elder.id;
 
-    // Seed a grid worker
-    const passwordHash = await bcrypt.hash('worker123', 10);
+    // Seed a grid worker (use encrypted phone + phoneHash like production)
+    const workerPhone = '13900000001';
+    const workerPhoneEncrypted = cryptoService.encrypt(workerPhone);
+    const workerPhoneHash = cryptoService.hashPhone(workerPhone);
+    const workerPasswordHash = await bcrypt.hash('worker123', 10);
     const worker = await prisma.user.create({
       data: {
         id: 'worker-e2e',
-        phone: '13900000001',
+        phone: workerPhoneEncrypted,
+        phoneHash: workerPhoneHash,
         name: '测试网格员',
         role: Role.GRID_WORKER,
-        passwordHash,
+        passwordHash: workerPasswordHash,
         district: '东区',
         dutyStatus: DutyStatus.ON_DUTY,
         skills: ['HEALTH'],
@@ -64,15 +71,19 @@ describe('WorkOrders E2E', () => {
     });
     workerId = worker.id;
 
-    // Seed an admin
-    const adminHash = await bcrypt.hash('admin123', 10);
+    // Seed an admin (use encrypted phone + phoneHash like production)
+    const adminPhone = '13900000000';
+    const adminPhoneEncrypted = cryptoService.encrypt(adminPhone);
+    const adminPhoneHash = cryptoService.hashPhone(adminPhone);
+    const adminPasswordHash = await bcrypt.hash('admin123', 10);
     await prisma.user.create({
       data: {
         id: 'admin-e2e',
-        phone: '13900000000',
+        phone: adminPhoneEncrypted,
+        phoneHash: adminPhoneHash,
         name: '测试管理员',
         role: Role.ADMIN,
-        passwordHash: adminHash,
+        passwordHash: adminPasswordHash,
         district: '东区',
       },
     });
@@ -176,11 +187,13 @@ describe('WorkOrders E2E', () => {
     });
 
     it('should reject assigning to non-assignable role', async () => {
-      // Create a family user
+      // Create a family user (use encrypted phone + phoneHash like production)
+      const famPhone = '13900000002';
       const famHash = await bcrypt.hash('fam123', 10);
       const fam = await prisma.user.create({
         data: {
-          phone: '13900000002',
+          phone: cryptoService.encrypt(famPhone),
+          phoneHash: cryptoService.hashPhone(famPhone),
           name: '测试家属',
           role: Role.FAMILY,
           passwordHash: famHash,
@@ -196,10 +209,12 @@ describe('WorkOrders E2E', () => {
 
     it('should reject illegal transition (already ASSIGNED → assign again to different user)', async () => {
       // Create another worker
+      const otherPhone = '13900000003';
       const otherHash = await bcrypt.hash('other123', 10);
       const other = await prisma.user.create({
         data: {
-          phone: '13900000003',
+          phone: cryptoService.encrypt(otherPhone),
+          phoneHash: cryptoService.hashPhone(otherPhone),
           name: '其他网格员',
           role: Role.GRID_WORKER,
           passwordHash: otherHash,
@@ -216,7 +231,7 @@ describe('WorkOrders E2E', () => {
         .send({ assigneeId: other.id })
         .expect(400); // BadRequestException from state machine guard
 
-      expect(response.body.code).toBe(500);
+      expect(response.body.code).toBe(400);
     });
   });
 
@@ -314,10 +329,12 @@ describe('WorkOrders E2E', () => {
   describe('Full lifecycle: create → assign → reassign → start → complete → evaluate', () => {
     it('should complete full happy path including reassign', async () => {
       // Create another worker for reassign
+      const worker2Phone = '13900000004';
       const hash2 = await bcrypt.hash('worker456', 10);
       const worker2 = await prisma.user.create({
         data: {
-          phone: '13900000004',
+          phone: cryptoService.encrypt(worker2Phone),
+          phoneHash: cryptoService.hashPhone(worker2Phone),
           name: '第二网格员',
           role: Role.GRID_WORKER,
           passwordHash: hash2,
@@ -429,7 +446,7 @@ describe('WorkOrders E2E', () => {
         .post(`/api/v1/work-orders/${woId}/cancel`)
         .set('Authorization', `Bearer ${workerToken}`)
         .send({})
-        .expect(500); // State machine throws: 进行中的工单取消时必须填写原因
+        .expect(400); // BadRequestException: 进行中的工单取消时必须填写原因
     });
 
     it('should reject transition PENDING → COMPLETED', async () => {
