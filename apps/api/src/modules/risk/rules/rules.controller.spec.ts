@@ -22,7 +22,7 @@ describe('RulesController', () => {
 
   it('findAll 应返回规则列表', async () => {
     mockRulesService.findAll.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
-    const result = await controller.findAll({ page: 1, limit: 20 });
+    const result = await controller.findAll(1, 20);
     expect(result.total).toBe(0);
   });
 

@@ -7,8 +7,10 @@ import { RiskLevel } from '@prisma/client';
 export class RulesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(query: { page: number; limit: number; enabled?: boolean }) {
-    const { page, limit, enabled } = query;
+  async findAll(query: { page?: number; limit?: number; enabled?: boolean }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const { enabled } = query;
     const skip = (page - 1) * limit;
     const where: any = {};
     if (enabled !== undefined) where.enabled = enabled;

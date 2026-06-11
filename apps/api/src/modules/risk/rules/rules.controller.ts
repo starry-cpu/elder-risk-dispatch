@@ -15,8 +15,12 @@ export class RulesController {
 
   @Get('risk/rules')
   @ApiOperation({ summary: '获取风险规则列表' })
-  findAll(@Query() query: any) {
-    return this.rulesService.findAll(query);
+  findAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('enabled') enabled?: string,
+  ) {
+    return this.rulesService.findAll({ page, limit, enabled: enabled !== undefined ? enabled === 'true' : undefined });
   }
 
   @Get('risk/rules/:id')

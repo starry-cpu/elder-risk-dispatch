@@ -4,6 +4,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { AiService } from './ai.service';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { ClassifyDto } from './dto/classify.dto';
+import { SummarizeDto } from './dto/summarize.dto';
 
 @ApiTags('AI')
 @ApiBearerAuth()
@@ -14,13 +16,13 @@ export class AiController {
 
   @Post('ai/classify')
   @ApiOperation({ summary: 'AI 文本分类（工单类型识别）' })
-  classify(@Body() body: { text: string }) {
-    return this.aiService.classify(body.text);
+  classify(@Body() dto: ClassifyDto) {
+    return this.aiService.classify(dto.text);
   }
 
   @Post('ai/summarize')
   @ApiOperation({ summary: 'AI 工单摘要生成' })
-  summarize(@Body() body: { workOrderId: string }) {
-    return this.aiService.summarize(body.workOrderId);
+  summarize(@Body() dto: SummarizeDto) {
+    return this.aiService.summarize(dto.workOrderId);
   }
 }

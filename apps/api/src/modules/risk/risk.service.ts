@@ -38,7 +38,7 @@ export class RiskService {
 
     // Check recent high risk (last 7 days)
     let recentHighRisk = input.recentHighRisk ?? false;
-    if (!input.recentHighRisk) {
+    if (input.recentHighRisk === undefined) {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const recent = await this.prisma.riskEvent.findFirst({
         where: { elderId: input.elderId, level: RiskLevel.HIGH, createdAt: { gte: sevenDaysAgo } },
