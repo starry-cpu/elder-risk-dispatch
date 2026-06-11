@@ -13,6 +13,10 @@ export class AiClient {
   }
 
   async chat(messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>): Promise<string> {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new InternalServerErrorException('OPENAI_API_KEY 未配置，无法调用 AI 服务');
+    }
+
     const maxRetries = 3;
     let lastError: Error | null = null;
 

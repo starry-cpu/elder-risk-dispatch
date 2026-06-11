@@ -7,6 +7,7 @@ describe('AiClient', () => {
   let mockCreate: jest.Mock;
 
   beforeEach(async () => {
+    process.env.OPENAI_API_KEY = 'sk-test-key';
     process.env.AI_MODEL = 'deepseek-chat';
 
     mockCreate = jest.fn();
