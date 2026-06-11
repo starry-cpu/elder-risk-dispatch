@@ -27,6 +27,7 @@ export interface OrderSummary {
 export interface TimelineDisplayItem {
   id: string;
   title: string;
+  status: string;
   statusLabel: string;
   level: string;
   createdAt: string;
@@ -37,6 +38,7 @@ export function useOrderProgress() {
     return {
       id: order.id,
       title: TYPE_LABELS[order.type] || order.type,
+      status: order.status,
       statusLabel: STATUS_LABELS[order.status] || order.status,
       level: order.level,
       createdAt: order.createdAt,
