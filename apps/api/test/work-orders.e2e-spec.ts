@@ -249,7 +249,7 @@ describe('WorkOrders E2E', () => {
       await request(app.getHttpServer())
         .post(`/api/v1/work-orders/${workOrderId}/start`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(400); // BadRequestException: 只有接单人员可以开始处理
+        .expect(403); // ForbiddenException: 只有接单人员可以开始处理
     });
   });
 

@@ -59,8 +59,10 @@ export class EvaluationsService {
     });
     if (!wo) throw new NotFoundException('工单不存在');
 
-    if (requester && requester.role !== Role.ADMIN && requester.district && wo.elder.district !== requester.district) {
-      throw new NotFoundException('工单不存在');
+    if (requester && requester.role !== Role.ADMIN) {
+      if (!requester.district || wo.elder.district !== requester.district) {
+        throw new NotFoundException('工单不存在');
+      }
     }
 
     return this.prisma.serviceEvaluation.findUnique({

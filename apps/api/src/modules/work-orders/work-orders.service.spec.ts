@@ -54,9 +54,10 @@ describe('WorkOrdersService', () => {
       });
       mockPrisma.workOrderTimeline.create.mockResolvedValue({ id: 'tl-1' });
       mockPrisma.riskEvent.findUnique.mockResolvedValue({
-        id: 're-1', status: RiskStatus.CONFIRMED, level: RiskLevel.HIGH,
+        id: 're-1', elderId: 'elder-1', status: RiskStatus.CONFIRMED, level: RiskLevel.HIGH,
         elder: { district: '东区' },
       });
+      mockPrisma.workOrder.findUnique.mockResolvedValue(null); // no existing work order
       mockPrisma.riskEvent.update.mockResolvedValue({ id: 're-1', status: RiskStatus.DISPATCHED });
       mockDispatch.recommend.mockResolvedValue([
         { userId: 'worker-1', name: '网格员A', score: 85, district: '东区',
@@ -88,7 +89,7 @@ describe('WorkOrdersService', () => {
     it('should reject unconfirmed risk events', async () => {
       mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
       mockPrisma.riskEvent.findUnique.mockResolvedValue({
-        id: 're-1', status: RiskStatus.PENDING_REVIEW,
+        id: 're-1', elderId: 'elder-1', status: RiskStatus.PENDING_REVIEW,
       });
       await expect(
         service.create({
@@ -233,7 +234,7 @@ describe('WorkOrdersService', () => {
       });
       mockPrisma.workOrderTimeline.create.mockResolvedValue({ id: 'tl-3' });
 
-      const result = await service.start('wo-1', { sub: 'worker-1', role: Role.GRID_WORKER });
+      const result = await service.start('wo-1', { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' });
 
       expect(result.status).toBe(WorkOrderStatus.IN_PROGRESS);
     });
@@ -245,7 +246,7 @@ describe('WorkOrdersService', () => {
       });
 
       await expect(
-        service.start('wo-1', { sub: 'worker-2', role: Role.GRID_WORKER }),
+        service.start('wo-1', { sub: 'worker-2', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('只有接单人员可以开始处理');
     });
   });
@@ -262,7 +263,7 @@ describe('WorkOrdersService', () => {
       mockPrisma.workOrderTimeline.create.mockResolvedValue({ id: 'tl-4' });
 
       const result = await service.complete('wo-1', { result: '已处理完毕', photos: [] },
-        { sub: 'worker-1', role: Role.GRID_WORKER });
+        { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' });
 
       expect(result.status).toBe(WorkOrderStatus.COMPLETED);
       expect(mockPrisma.workOrder.update).toHaveBeenCalledWith(
@@ -280,7 +281,7 @@ describe('WorkOrdersService', () => {
 
       await expect(
         service.complete('wo-1', { result: '', photos: [] },
-          { sub: 'worker-1', role: Role.GRID_WORKER }),
+          { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('完成工单必须填写处理结果');
     });
 
@@ -292,7 +293,7 @@ describe('WorkOrdersService', () => {
 
       await expect(
         service.complete('wo-1', { result: 'done', photos: [] },
-          { sub: 'worker-2', role: Role.GRID_WORKER }),
+          { sub: 'worker-2', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('只有接单人员可以完成工单');
     });
   });
@@ -319,7 +320,7 @@ describe('WorkOrdersService', () => {
       });
 
       await expect(
-        service.cancel('wo-1', '', { sub: 'worker-1', role: Role.GRID_WORKER }),
+        service.cancel('wo-1', '', { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('进行中的工单取消时必须填写原因');
     });
   });
