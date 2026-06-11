@@ -1,6 +1,6 @@
 // apps/api/src/modules/ai/ai.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { AiService } from './ai.service';
+import { AiService, isAbnormalTextResult } from './ai.service';
 import { AiClient } from './ai-client.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { WorkOrderType } from '@prisma/client';
@@ -79,5 +79,37 @@ describe('AiService', () => {
       mockPrisma.workOrder.findUnique.mockResolvedValue(null);
       await expect(service.summarize('nonexistent')).rejects.toThrow('不存在');
     });
+  });
+});
+
+describe('isAbnormalTextResult', () => {
+  it('HEALTH + confidence >= 0.7 should be abnormal', () => {
+    const result = isAbnormalTextResult({ type: 'HEALTH', confidence: 0.85, needsHumanReview: false });
+    expect(result).toBe(true);
+  });
+
+  it('HEALTH + confidence = 0.7 (boundary) should be abnormal', () => {
+    const result = isAbnormalTextResult({ type: 'HEALTH', confidence: 0.7, needsHumanReview: false });
+    expect(result).toBe(true);
+  });
+
+  it('HEALTH + confidence < 0.7 and needsHumanReview=false should NOT be abnormal', () => {
+    const result = isAbnormalTextResult({ type: 'HEALTH', confidence: 0.69, needsHumanReview: false });
+    expect(result).toBe(false);
+  });
+
+  it('non-HEALTH type + high confidence should NOT be abnormal', () => {
+    const result = isAbnormalTextResult({ type: 'ERRAND', confidence: 0.95, needsHumanReview: false });
+    expect(result).toBe(false);
+  });
+
+  it('needsHumanReview=true should be abnormal (low confidence)', () => {
+    const result = isAbnormalTextResult({ type: 'LIFE', confidence: 0.45, needsHumanReview: true });
+    expect(result).toBe(true);
+  });
+
+  it('needsHumanReview=false + non-HEALTH + high confidence should NOT be abnormal', () => {
+    const result = isAbnormalTextResult({ type: 'COMPANION', confidence: 0.88, needsHumanReview: false });
+    expect(result).toBe(false);
   });
 });

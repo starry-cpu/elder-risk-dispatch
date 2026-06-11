@@ -96,3 +96,21 @@ export class AiService {
     }
   }
 }
+
+/**
+ * Determines whether an AI classification result represents "abnormal text".
+ * Pure function — no external dependencies, easy to unit test and reuse.
+ *
+ * Abnormal detection rules:
+ * - HEALTH type + confidence ≥ 0.7 → elder actively expressing health concerns
+ * - needsHumanReview === true (confidence < 0.6) → text is ambiguous, possible cognitive anomaly
+ */
+export function isAbnormalTextResult(result: {
+  type: string;
+  confidence: number;
+  needsHumanReview: boolean;
+}): boolean {
+  if (result.type === 'HEALTH' && result.confidence >= 0.7) return true;
+  if (result.needsHumanReview) return true;
+  return false;
+}
