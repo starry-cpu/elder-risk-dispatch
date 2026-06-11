@@ -33,7 +33,10 @@ client.interceptors.response.use(
   (error: AxiosError<ApiResponse>) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
     }
     const msg = error.response?.data?.message || error.message || '网络错误';
     ElMessage.error(msg);
