@@ -42,13 +42,11 @@ export class DashboardService {
   ): Promise<RiskOverviewDto> {
     const createdAt = this.getDateRange(query.period);
     const elderWhere = this.buildElderWhere(requester);
-    const hasDistrictFilter =
-      requester.role !== Role.ADMIN &&
-      requester.role !== Role.FAMILY &&
-      requester.role !== Role.VOLUNTEER;
 
     const where: Record<string, unknown> = { createdAt };
-    if (hasDistrictFilter) {
+    // Apply elder filter for ALL non-ADMIN roles (district for grid workers,
+    // familyLinks for FAMILY/VOLUNTEER)
+    if (Object.keys(elderWhere).length > 0) {
       where.elder = elderWhere;
     }
 
@@ -99,13 +97,11 @@ export class DashboardService {
   ): Promise<WorkOrderEfficiencyDto> {
     const createdAt = this.getDateRange(query.period);
     const elderWhere = this.buildElderWhere(requester);
-    const hasDistrictFilter =
-      requester.role !== Role.ADMIN &&
-      requester.role !== Role.FAMILY &&
-      requester.role !== Role.VOLUNTEER;
 
     const where: Record<string, unknown> = { createdAt };
-    if (hasDistrictFilter) {
+    // Apply elder filter for ALL non-ADMIN roles (district for grid workers,
+    // familyLinks for FAMILY/VOLUNTEER)
+    if (Object.keys(elderWhere).length > 0) {
       where.elder = elderWhere;
     }
 

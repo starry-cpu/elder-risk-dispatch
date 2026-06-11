@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DashboardGateway } from './dashboard.gateway';
-import { NotificationsService } from '../notifications.service';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 
@@ -17,7 +16,6 @@ describe('DashboardGateway', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DashboardGateway,
-        { provide: NotificationsService, useValue: { emitAndPersist: jest.fn() } },
         {
           provide: JwtService,
           useValue: { verify: jest.fn().mockReturnValue({ sub: 'u-1', role: 'ADMIN', district: '朝阳区' }) },

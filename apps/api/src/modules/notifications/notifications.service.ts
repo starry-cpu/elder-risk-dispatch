@@ -99,7 +99,7 @@ export class NotificationsService {
         targetId: roomId,
         channel: 'websocket',
         templateId: null,
-        payload: { event, ...payload } as any,
+        payload: { ...payload, event } as Prisma.InputJsonValue,
         status: 'SENT',
         sentAt: new Date(),
       },

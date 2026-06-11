@@ -7,7 +7,6 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { NotificationsService } from '../notifications.service';
 
 @WebSocketGateway({
   namespace: '/dashboard',
@@ -24,7 +23,6 @@ export class DashboardGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly notificationsService: NotificationsService,
   ) {}
 
   handleConnection(client: Socket): void {

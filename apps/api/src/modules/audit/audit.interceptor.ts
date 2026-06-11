@@ -39,9 +39,8 @@ export class AuditInterceptor implements NestInterceptor {
     const userId = request.user?.sub ?? null;
     const ip = request.ip ?? null;
     const { resourceType, action, options } = metadata;
-    const resourceId = options.resourceIdParam
-      ? request.params[options.resourceIdParam] ?? null
-      : null;
+    const resourceIdParam = options.resourceIdParam ?? 'id';
+    const resourceId = request.params[resourceIdParam] ?? null;
 
     let detail: Prisma.InputJsonValue | null = null;
     if (options.logRequestBody && request.body) {

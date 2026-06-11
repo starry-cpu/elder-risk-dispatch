@@ -1,6 +1,6 @@
 // apps/api/src/modules/risk/risk.service.ts
 import {
-  Injectable, NotFoundException, BadRequestException,
+  Injectable, NotFoundException, BadRequestException, Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RiskScoringService } from './risk-scoring.service';
@@ -15,6 +15,8 @@ interface Requester {
 
 @Injectable()
 export class RiskService {
+  private readonly logger = new Logger(RiskService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly scoring: RiskScoringService,
@@ -91,7 +93,9 @@ export class RiskService {
           source: event.source,
           reason: event.reason,
         },
-      }).catch(() => { /* WS push failure should not affect main flow */ });
+      }).catch((err: unknown) => {
+        this.logger.warn(`WS push failed (risk:alert): ${err instanceof Error ? err.message : String(err)}`);
+      });
 
       // Also notify the elder's district
       if (elder.district) {
@@ -106,7 +110,9 @@ export class RiskService {
             source: event.source,
             reason: event.reason,
           },
-        }).catch(() => { /* WS push failure should not affect main flow */ });
+        }).catch((err: unknown) => {
+        this.logger.warn(`WS push failed (risk:alert): ${err instanceof Error ? err.message : String(err)}`);
+      });
       }
     }
 

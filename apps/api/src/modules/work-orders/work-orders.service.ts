@@ -53,7 +53,9 @@ export class WorkOrdersService {
         roomType: 'user',
         roomId: assigneeId,
         payload,
-      }).catch(() => { /* ignore */ });
+      }).catch((err: unknown) => {
+        this.logger.warn(`WS push failed (assignee ${assigneeId}): ${err instanceof Error ? err.message : String(err)}`);
+      });
     }
 
     // Notify ADMIN role
@@ -62,7 +64,9 @@ export class WorkOrdersService {
       roomType: 'role',
       roomId: 'ADMIN',
       payload,
-    }).catch(() => { /* ignore */ });
+    }).catch((err: unknown) => {
+      this.logger.warn(`WS push failed (ADMIN broadcast): ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
 
   async create(
