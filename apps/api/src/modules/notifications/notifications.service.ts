@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
@@ -152,10 +152,24 @@ export class NotificationsService {
   }
 
   async markAsRead(notificationId: string, userId: string): Promise<void> {
-    await this.prisma.notification.update({
-      where: { id: notificationId, targetType: 'USER', targetId: userId },
-      data: { readAt: new Date() },
-    });
+    try {
+      await this.prisma.notification.update({
+        where: { id: notificationId, targetType: 'USER', targetId: userId },
+        data: { readAt: new Date() },
+      });
+    } catch (error) {
+      // Prisma throws P2025 when record not found (wrong id, wrong user, or already deleted)
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Record<string, unknown>).code === 'P2025'
+      ) {
+        throw new NotFoundException(
+          '通知不存在或无权访问',
+        );
+      }
+      throw error;
+    }
   }
 
   async getUnreadCount(userId: string): Promise<number> {

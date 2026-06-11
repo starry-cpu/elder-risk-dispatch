@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -184,6 +185,16 @@ describe('NotificationsService', () => {
         where: { id: 'n-1', targetType: 'USER', targetId: 'u-1' },
         data: { readAt: expect.any(Date) },
       });
+    });
+
+    it('通知不存在或不属于用户时应抛出 NotFoundException', async () => {
+      const prismaError = new Error('Record not found') as Error & { code: string };
+      prismaError.code = 'P2025';
+      mockPrisma.notification.update.mockRejectedValue(prismaError);
+
+      await expect(
+        service.markAsRead('n-999', 'u-1'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
