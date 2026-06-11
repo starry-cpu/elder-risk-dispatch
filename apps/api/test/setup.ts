@@ -1,9 +1,11 @@
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { RedisContainer, StartedRedisContainer } from '@testcontainers/redis';
 import { execSync } from 'child_process';
 import * as path from 'path';
 
 declare global {
   var __PG_CONTAINER__: StartedPostgreSqlContainer | undefined;
+  var __REDIS_CONTAINER__: StartedRedisContainer | undefined;
 }
 
 export default async function globalSetup() {
@@ -27,4 +29,11 @@ export default async function globalSetup() {
   });
 
   console.log('Test database ready');
+
+  console.log('Starting Redis test container...');
+  const redisContainer = await new RedisContainer('redis:7-alpine').start();
+  process.env.REDIS_URL = redisContainer.getConnectionUrl();
+  globalThis.__REDIS_CONTAINER__ = redisContainer;
+
+  console.log('Redis test container ready');
 }

@@ -44,7 +44,7 @@ describe('WorkOrders E2E', () => {
     // Seed an elder
     const elder = await prisma.elder.create({
       data: {
-        id: 'elder-e2e',
+        id: 'elder-e2e-wo',
         name: '测试老人',
         district: '东区',
       },
@@ -58,7 +58,7 @@ describe('WorkOrders E2E', () => {
     const workerPasswordHash = await bcrypt.hash('worker123', 10);
     const worker = await prisma.user.create({
       data: {
-        id: 'worker-e2e',
+        id: 'worker-e2e-wo',
         phone: workerPhoneEncrypted,
         phoneHash: workerPhoneHash,
         name: '测试网格员',
@@ -78,7 +78,7 @@ describe('WorkOrders E2E', () => {
     const adminPasswordHash = await bcrypt.hash('admin123', 10);
     await prisma.user.create({
       data: {
-        id: 'admin-e2e',
+        id: 'admin-e2e-wo',
         phone: adminPhoneEncrypted,
         phoneHash: adminPhoneHash,
         name: '测试管理员',
@@ -249,7 +249,7 @@ describe('WorkOrders E2E', () => {
       await request(app.getHttpServer())
         .post(`/api/v1/work-orders/${workOrderId}/start`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(400); // BadRequestException: 只有接单人员可以开始处理
+        .expect(403); // ForbiddenException: 只有接单人员可以开始处理
     });
   });
 

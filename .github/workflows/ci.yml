@@ -131,6 +131,15 @@ jobs:
             sleep 10
           done
           docker image ls postgres:16-alpine
+      - name: Pre-pull Redis image (with retry)
+        run: |
+          for i in 1 2 3; do
+            echo "Attempt $i: pulling redis:7-alpine..."
+            docker pull redis:7-alpine && break
+            echo "Pull failed, waiting 10s..."
+            sleep 10
+          done
+          docker image ls redis:7-alpine
       - name: Run E2E tests
         working-directory: apps/api
         run: pnpm test:e2e

@@ -25,11 +25,9 @@ function safeTransition(
 }
 
 function checkDistrictAccess(wo: { elder: { district: string } }, requester: Requester): void {
-  if (
-    requester.role !== Role.ADMIN &&
-    requester.district &&
-    wo.elder.district !== requester.district
-  ) {
+  if (requester.role === Role.ADMIN) return;
+  // Non-ADMIN users MUST have a district and can only access their own district
+  if (!requester.district || wo.elder.district !== requester.district) {
     throw new NotFoundException('工单不存在');
   }
 }
@@ -55,15 +53,32 @@ export class WorkOrdersService {
     const elder = await this.prisma.elder.findUnique({ where: { id: input.elderId } });
     if (!elder) throw new NotFoundException('老人不存在');
 
-    let riskEvent: { level: RiskLevel; status: RiskStatus; elder: { district: string } } | null = null;
+    // District isolation: non-ADMIN can only create work orders for elders in their district
+    checkDistrictAccess({ elder: { district: elder.district } }, requester);
+
+    let riskEvent: { level: RiskLevel; status: RiskStatus; elderId: string; elder: { district: string } } | null = null;
     if (input.riskEventId) {
       riskEvent = await this.prisma.riskEvent.findUnique({
         where: { id: input.riskEventId },
         include: { elder: { select: { district: true } } },
       });
       if (!riskEvent) throw new NotFoundException('风险事件不存在');
+
+      // Validate risk event belongs to the same elder
+      if (riskEvent.elderId !== input.elderId) {
+        throw new BadRequestException('风险事件不属于该老人');
+      }
+
       if (riskEvent.status !== RiskStatus.CONFIRMED) {
         throw new BadRequestException('仅已确认的风险事件可生成工单');
+      }
+
+      // Prevent duplicate work orders for the same risk event (riskEventId is @unique)
+      const existing = await this.prisma.workOrder.findUnique({
+        where: { riskEventId: input.riskEventId },
+      });
+      if (existing) {
+        throw new BadRequestException('该风险事件已生成工单');
       }
     }
 
@@ -162,7 +177,7 @@ export class WorkOrdersService {
       where: { id },
       include: {
         elder: { select: { id: true, name: true, district: true } },
-        assignee: { select: { id: true, name: true, phone: true } },
+        assignee: { select: { id: true, name: true } },
         timeline: { orderBy: { createdAt: 'asc' } },
         evaluation: true,
         riskEvent: { select: { id: true, level: true, source: true } },
@@ -218,9 +233,11 @@ export class WorkOrdersService {
     if (!wo) throw new NotFoundException('工单不存在');
     checkDistrictAccess(wo, requester);
 
-    safeTransition(wo.status, WorkOrderStatus.IN_PROGRESS, {
-      isAssignee: wo.assigneeId === requester.sub,
-    });
+    if (wo.assigneeId !== requester.sub) {
+      throw new ForbiddenException('只有接单人员可以开始处理');
+    }
+
+    safeTransition(wo.status, WorkOrderStatus.IN_PROGRESS, { isAssignee: true });
 
     const updated = await this.prisma.workOrder.update({
       where: { id },
@@ -284,6 +301,15 @@ export class WorkOrdersService {
     });
     if (!wo) throw new NotFoundException('工单不存在');
     checkDistrictAccess(wo, requester);
+
+    // Only ADMIN, GRID_WORKER, or the assignee can cancel
+    if (
+      requester.role !== Role.ADMIN &&
+      requester.role !== Role.GRID_WORKER &&
+      wo.assigneeId !== requester.sub
+    ) {
+      throw new ForbiddenException('无权限取消该工单');
+    }
 
     const hasReason = reason !== undefined && reason.trim().length > 0;
 
@@ -365,5 +391,34 @@ export class WorkOrdersService {
       where: { workOrderId: id },
       orderBy: { createdAt: 'asc' },
     });
+  }
+  async escalate(id: string) {
+    const wo = await this.prisma.workOrder.findUnique({
+      where: { id },
+    });
+    if (!wo) throw new NotFoundException('工单不存在');
+
+    // Escalate level: LOW -> MEDIUM, MEDIUM -> HIGH, HIGH stays HIGH
+    const levelOrder: RiskLevel[] = [RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH];
+    const currentIdx = levelOrder.indexOf(wo.level);
+    if (currentIdx < levelOrder.length - 1) {
+      const newLevel = levelOrder[currentIdx + 1];
+      const updated = await this.prisma.workOrder.update({
+        where: { id },
+        data: { level: newLevel },
+      });
+
+      await this.prisma.workOrderTimeline.create({
+        data: {
+          workOrderId: id,
+          action: 'ESCALATED',
+          note: `超时自动升级: ${wo.level} → ${newLevel}`,
+        },
+      });
+
+      return updated;
+    }
+
+    return wo;
   }
 }

@@ -116,7 +116,6 @@ class WorkOrderStateMachine {
 | 方法 | 路径 | 说明 | 角色 |
 |---|---|---|---|
 | `POST` | `/work-orders/:id/assign` | 指定接单人员（操作员确认/覆盖推荐） | ADMIN, GRID_WORKER |
-| `POST` | `/work-orders/:id/accept` | 接单人员接受工单 | 仅接单者 |
 | `POST` | `/work-orders/:id/start` | 开始处理（→ IN_PROGRESS） | 仅接单者 |
 | `POST` | `/work-orders/:id/complete` | 提交处理结果（→ COMPLETED） | 仅接单者 |
 | `POST` | `/work-orders/:id/cancel` | 取消工单（IN_PROGRESS 须填原因） | ADMIN, GRID_WORKER, 或接单者 |

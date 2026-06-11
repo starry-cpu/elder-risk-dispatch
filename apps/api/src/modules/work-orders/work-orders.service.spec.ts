@@ -40,6 +40,7 @@ describe('WorkOrdersService', () => {
         { provide: DispatchRecommendationService, useValue: mockDispatch },
       ],
     }).compile();
+
     service = module.get<WorkOrdersService>(WorkOrdersService);
     jest.clearAllMocks();
   });
@@ -53,9 +54,10 @@ describe('WorkOrdersService', () => {
       });
       mockPrisma.workOrderTimeline.create.mockResolvedValue({ id: 'tl-1' });
       mockPrisma.riskEvent.findUnique.mockResolvedValue({
-        id: 're-1', status: RiskStatus.CONFIRMED, level: RiskLevel.HIGH,
+        id: 're-1', elderId: 'elder-1', status: RiskStatus.CONFIRMED, level: RiskLevel.HIGH,
         elder: { district: '东区' },
       });
+      mockPrisma.workOrder.findUnique.mockResolvedValue(null); // no existing work order
       mockPrisma.riskEvent.update.mockResolvedValue({ id: 're-1', status: RiskStatus.DISPATCHED });
       mockDispatch.recommend.mockResolvedValue([
         { userId: 'worker-1', name: '网格员A', score: 85, district: '东区',
@@ -74,7 +76,6 @@ describe('WorkOrdersService', () => {
       expect(mockPrisma.workOrderTimeline.create).toHaveBeenCalledWith({
         data: { workOrderId: 'wo-1', action: 'CREATED', operatorId: 'admin-1', note: '测试创建' },
       });
-      // DispatchRecommendationService.recommend takes (riskEventId, workOrderType)
       expect(mockDispatch.recommend).toHaveBeenCalledWith('re-1', WorkOrderType.HEALTH);
     });
 
@@ -88,7 +89,7 @@ describe('WorkOrdersService', () => {
     it('should reject unconfirmed risk events', async () => {
       mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
       mockPrisma.riskEvent.findUnique.mockResolvedValue({
-        id: 're-1', status: RiskStatus.PENDING_REVIEW,
+        id: 're-1', elderId: 'elder-1', status: RiskStatus.PENDING_REVIEW,
       });
       await expect(
         service.create({
@@ -233,7 +234,7 @@ describe('WorkOrdersService', () => {
       });
       mockPrisma.workOrderTimeline.create.mockResolvedValue({ id: 'tl-3' });
 
-      const result = await service.start('wo-1', { sub: 'worker-1', role: Role.GRID_WORKER });
+      const result = await service.start('wo-1', { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' });
 
       expect(result.status).toBe(WorkOrderStatus.IN_PROGRESS);
     });
@@ -245,7 +246,7 @@ describe('WorkOrdersService', () => {
       });
 
       await expect(
-        service.start('wo-1', { sub: 'worker-2', role: Role.GRID_WORKER }),
+        service.start('wo-1', { sub: 'worker-2', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('只有接单人员可以开始处理');
     });
   });
@@ -262,7 +263,7 @@ describe('WorkOrdersService', () => {
       mockPrisma.workOrderTimeline.create.mockResolvedValue({ id: 'tl-4' });
 
       const result = await service.complete('wo-1', { result: '已处理完毕', photos: [] },
-        { sub: 'worker-1', role: Role.GRID_WORKER });
+        { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' });
 
       expect(result.status).toBe(WorkOrderStatus.COMPLETED);
       expect(mockPrisma.workOrder.update).toHaveBeenCalledWith(
@@ -280,7 +281,7 @@ describe('WorkOrdersService', () => {
 
       await expect(
         service.complete('wo-1', { result: '', photos: [] },
-          { sub: 'worker-1', role: Role.GRID_WORKER }),
+          { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('完成工单必须填写处理结果');
     });
 
@@ -292,7 +293,7 @@ describe('WorkOrdersService', () => {
 
       await expect(
         service.complete('wo-1', { result: 'done', photos: [] },
-          { sub: 'worker-2', role: Role.GRID_WORKER }),
+          { sub: 'worker-2', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('只有接单人员可以完成工单');
     });
   });
@@ -319,7 +320,7 @@ describe('WorkOrdersService', () => {
       });
 
       await expect(
-        service.cancel('wo-1', '', { sub: 'worker-1', role: Role.GRID_WORKER }),
+        service.cancel('wo-1', '', { sub: 'worker-1', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('进行中的工单取消时必须填写原因');
     });
   });
@@ -391,6 +392,53 @@ describe('WorkOrdersService', () => {
       await expect(
         service.getTimeline('wo-1', { sub: 'w1', role: Role.GRID_WORKER, district: '东区' }),
       ).rejects.toThrow('工单不存在');
+    });
+  });
+
+  describe('escalate', () => {
+    const overdueWo = {
+      id: 'wo-1', elderId: 'elder-1', level: RiskLevel.MEDIUM, status: WorkOrderStatus.IN_PROGRESS,
+      assigneeId: 'worker-1', deadline: new Date('2024-01-01'),
+      elder: { district: '朝阳区' },
+    };
+
+    it('should bump level from MEDIUM to HIGH and add timeline', async () => {
+      mockPrisma.workOrder.findUnique.mockResolvedValue(overdueWo);
+      mockPrisma.workOrder.update.mockResolvedValue({
+        ...overdueWo, level: RiskLevel.HIGH,
+      });
+      mockPrisma.workOrderTimeline.create.mockResolvedValue({ id: 'tl-1' });
+
+      const result = await service.escalate('wo-1');
+
+      expect(result.level).toBe(RiskLevel.HIGH);
+      expect(mockPrisma.workOrder.update).toHaveBeenCalledWith({
+        where: { id: 'wo-1' },
+        data: { level: RiskLevel.HIGH },
+      });
+      expect(mockPrisma.workOrderTimeline.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          workOrderId: 'wo-1',
+          action: 'ESCALATED',
+          note: expect.stringContaining('超时自动升级'),
+        }),
+      });
+    });
+
+    it('should not escalate HIGH level work orders', async () => {
+      const highWo = { ...overdueWo, level: RiskLevel.HIGH };
+      mockPrisma.workOrder.findUnique.mockResolvedValue(highWo);
+
+      const result = await service.escalate('wo-1');
+
+      expect(result.level).toBe(RiskLevel.HIGH);
+      expect(mockPrisma.workOrder.update).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException for missing work order', async () => {
+      mockPrisma.workOrder.findUnique.mockResolvedValue(null);
+
+      await expect(service.escalate('nonexistent')).rejects.toThrow('工单不存在');
     });
   });
 });

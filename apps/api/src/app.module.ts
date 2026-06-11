@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -13,12 +14,19 @@ import { DevicesModule } from './modules/devices/devices.module';
 import { RiskModule } from './modules/risk/risk.module';
 import { AiModule } from './modules/ai/ai.module';
 import { WorkOrdersModule } from './modules/work-orders/work-orders.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    BullModule.forRoot({
+      connection: {
+        url: process.env.REDIS_URL ?? 'redis://localhost:6383',
+      },
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -31,6 +39,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     RiskModule,
     AiModule,
     WorkOrdersModule,
+    NotificationsModule,
+    SchedulerModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
