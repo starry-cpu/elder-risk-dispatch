@@ -190,25 +190,34 @@ export class DashboardService {
       _count: { id: true },
     });
 
-    const byDistrict = await Promise.all(
-      districtGroups.map(async (d) => {
-        const checkedIn = await this.prisma.checkIn.count({
-          where: {
-            createdAt: { gte: sevenDaysAgo },
-            elder: { district: d.district },
-          },
-        });
-        return {
-          district: d.district,
-          total: d._count.id,
-          checkedIn,
-          rate:
-            d._count.id > 0
-              ? Math.round((checkedIn / d._count.id) * 100)
-              : 0,
-        };
-      }),
-    );
+    // Single batch query: fetch all check-ins in the period with elder district
+    const recentCheckIns = await this.prisma.checkIn.findMany({
+      where: {
+        createdAt: { gte: sevenDaysAgo },
+        elder: elderWhere,
+      },
+      select: { elder: { select: { district: true } } },
+    });
+
+    // Aggregate by district in application code (fast, no N+1)
+    const checkInCountByDistrict = new Map<string, number>();
+    for (const ci of recentCheckIns) {
+      const d = ci.elder.district;
+      checkInCountByDistrict.set(d, (checkInCountByDistrict.get(d) ?? 0) + 1);
+    }
+
+    const byDistrict = districtGroups.map((d) => {
+      const checkedIn = checkInCountByDistrict.get(d.district) ?? 0;
+      return {
+        district: d.district,
+        total: d._count.id,
+        checkedIn,
+        rate:
+          d._count.id > 0
+            ? Math.round((checkedIn / d._count.id) * 100)
+            : 0,
+      };
+    });
 
     const highRiskElders = await this.prisma.elder.findMany({
       where: {
@@ -280,41 +289,58 @@ export class DashboardService {
       },
     });
 
-    const result = await Promise.all(
-      workers.map(async (w) => {
-        const completedOrders = await this.prisma.workOrder.count({
-          where: { assigneeId: w.id, status: 'COMPLETED' },
-        });
+    const workerIds = workers.map((w) => w.id);
 
-        const completedList = await this.prisma.workOrder.findMany({
-          where: { assigneeId: w.id, status: 'COMPLETED' },
-          select: { createdAt: true, completedAt: true },
-        });
+    // Single query: completed order counts per worker
+    const completedCounts = await this.prisma.workOrder.groupBy({
+      by: ['assigneeId'],
+      where: { assigneeId: { in: workerIds }, status: 'COMPLETED' },
+      _count: { id: true },
+    });
 
-        let totalResponseMs = 0;
-        for (const wo of completedList) {
-          if (wo.completedAt) {
-            totalResponseMs +=
-              wo.completedAt.getTime() - wo.createdAt.getTime();
-          }
-        }
+    // Single query: all completed orders for avg time calculation
+    const allCompleted = await this.prisma.workOrder.findMany({
+      where: { assigneeId: { in: workerIds }, status: 'COMPLETED' },
+      select: { assigneeId: true, createdAt: true, completedAt: true },
+    });
 
-        return {
-          userId: w.id,
-          name: w.name,
-          role: w.role,
-          district: w.district ?? '',
-          dutyStatus: w.dutyStatus,
-          completedOrders,
-          avgResponseHours:
-            completedList.length > 0
-              ? Math.round(
-                  (totalResponseMs / completedList.length / 3600000) * 100,
-                ) / 100
-              : 0,
-        };
-      }),
-    );
+    // Build lookup maps
+    const countMap = new Map<string, number>();
+    for (const c of completedCounts) {
+      if (c.assigneeId) countMap.set(c.assigneeId, c._count.id);
+    }
+
+    const timeMap = new Map<string, number[]>();
+    for (const wo of allCompleted) {
+      if (wo.assigneeId && wo.completedAt) {
+        const ms = wo.completedAt.getTime() - wo.createdAt.getTime();
+        const arr = timeMap.get(wo.assigneeId) ?? [];
+        arr.push(ms);
+        timeMap.set(wo.assigneeId, arr);
+      }
+    }
+
+    const result = workers.map((w) => {
+      const completedOrders = countMap.get(w.id) ?? 0;
+      const times = timeMap.get(w.id) ?? [];
+      const avgResponseHours =
+        times.length > 0
+          ? Math.round(
+              (times.reduce((a, b) => a + b, 0) / times.length / 3600000) *
+                100,
+            ) / 100
+          : 0;
+
+      return {
+        userId: w.id,
+        name: w.name,
+        role: w.role,
+        district: w.district ?? '',
+        dutyStatus: w.dutyStatus,
+        completedOrders,
+        avgResponseHours,
+      };
+    });
 
     return { workers: result };
   }
