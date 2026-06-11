@@ -63,7 +63,7 @@ export class CheckInsService {
 
     // Fire-and-forget: AI abnormal text detection does not block CheckIn response
     if (dto.content && (dto.method === CheckInMethod.TEXT || dto.method === CheckInMethod.PROXY)) {
-      this.detectAbnormalText(dto.elderId, dto.content);
+      void this.detectAbnormalText(dto.elderId, dto.content);
     }
 
     return checkIn;
