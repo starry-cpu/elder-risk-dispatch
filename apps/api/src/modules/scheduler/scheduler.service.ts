@@ -26,7 +26,8 @@ export class SchedulerService {
     });
 
     try {
-      const thresholdHours = parseInt(process.env.MISSED_CHECKIN_THRESHOLD_HOURS ?? '24', 10);
+      const rawThreshold = parseInt(process.env.MISSED_CHECKIN_THRESHOLD_HOURS ?? '24', 10);
+      const thresholdHours = isNaN(rawThreshold) || rawThreshold <= 0 ? 24 : rawThreshold;
       const threshold = new Date(Date.now() - thresholdHours * 60 * 60 * 1000);
 
       const elders = await this.prisma.elder.findMany({
@@ -112,21 +113,24 @@ export class SchedulerService {
 
       for (const wo of overdueOrders) {
         try {
-          await this.workOrdersService.escalate(wo.id);
-          escalated++;
+          const oldLevel = wo.level;
+          const updated = await this.workOrdersService.escalate(wo.id);
+          if (updated.level !== oldLevel) {
+            escalated++;
 
-          try {
-            await this.notificationsService.send({
-              targetType: 'USER',
-              targetId: 'system',
-              templateId: process.env.WECHAT_TEMPLATE_ESCALATION,
-              payload: {
-                thing1: { value: wo.id },
-                thing2: { value: `工单超时自动升级: ${wo.level}` },
-              },
-            });
-          } catch (notifError: any) {
-            this.logger.warn(`Failed to enqueue escalation notification for wo ${wo.id}`);
+            try {
+              await this.notificationsService.send({
+                targetType: 'USER',
+                targetId: 'system',
+                templateId: process.env.WECHAT_TEMPLATE_ESCALATION,
+                payload: {
+                  thing1: { value: wo.id },
+                  thing2: { value: `工单超时自动升级: ${oldLevel} → ${updated.level}` },
+                },
+              });
+            } catch (notifError: any) {
+              this.logger.warn(`Failed to enqueue escalation notification for wo ${wo.id}`);
+            }
           }
         } catch (error: any) {
           this.logger.error(`Failed to escalate work order ${wo.id}: ${error.message}`);

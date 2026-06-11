@@ -32,12 +32,16 @@ export class WeChatChannel implements INotificationChannel {
       return { success: false, error: 'WeChat APPID/SECRET not configured' };
     }
 
+    if (!input.templateId) {
+      return { success: false, error: 'WeChat templateId is required' };
+    }
+
     try {
       const accessToken = await this.getAccessToken(appId, secret);
 
       const body = {
         touser: input.targetId,
-        template_id: input.templateId ?? '',
+        template_id: input.templateId,
         data: input.payload,
       };
 

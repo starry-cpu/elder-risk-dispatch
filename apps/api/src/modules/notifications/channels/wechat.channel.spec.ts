@@ -121,6 +121,22 @@ describe('WeChatChannel', () => {
     expect(result.error).toContain('WeChat APPID/SECRET not configured');
   });
 
+  it('should return success false when templateId is missing', async () => {
+    process.env.WECHAT_APPID = 'wx-test-appid';
+    process.env.WECHAT_SECRET = 'test-secret';
+
+    channel = new WeChatChannel();
+
+    const result = await channel.send({
+      targetType: 'USER',
+      targetId: 'openid-xxx',
+      payload: {},
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('templateId is required');
+  });
+
   it('should re-fetch token if cached token is stale (>7000s)', async () => {
     process.env.WECHAT_APPID = 'wx-test-appid';
     process.env.WECHAT_SECRET = 'test-secret';

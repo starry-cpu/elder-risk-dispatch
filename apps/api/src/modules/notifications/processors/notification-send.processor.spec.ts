@@ -3,7 +3,6 @@ import { NotificationSendProcessor } from './notification-send.processor';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ConsoleChannel } from '../channels/console.channel';
 import { WeChatChannel } from '../channels/wechat.channel';
-import { NOTIFICATION_CHANNEL } from '../channels/notification-channel.interface';
 import { Job } from 'bullmq';
 
 describe('NotificationSendProcessor', () => {
@@ -36,7 +35,6 @@ describe('NotificationSendProcessor', () => {
         { provide: ConsoleChannel, useValue: mockConsoleChannel },
         { provide: WeChatChannel, useValue: mockWechatChannel },
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: NOTIFICATION_CHANNEL, useValue: 'console' },
       ],
     }).compile();
 
@@ -62,21 +60,10 @@ describe('NotificationSendProcessor', () => {
       });
     });
 
-    it('should dispatch to WeChatChannel when NOTIFICATION_CHANNEL is "wechat"', async () => {
-      const module2: TestingModule = await Test.createTestingModule({
-        providers: [
-          NotificationSendProcessor,
-          { provide: ConsoleChannel, useValue: mockConsoleChannel },
-          { provide: WeChatChannel, useValue: mockWechatChannel },
-          { provide: PrismaService, useValue: mockPrisma },
-          { provide: NOTIFICATION_CHANNEL, useValue: 'wechat' },
-        ],
-      }).compile();
-
-      const p2 = module2.get<NotificationSendProcessor>(NotificationSendProcessor);
+    it('should dispatch to WeChatChannel when job data channel is "wechat"', async () => {
       mockWechatChannel.send.mockResolvedValue({ success: true });
 
-      await p2.process(mockJob());
+      await processor.process(mockJob({ data: { ...mockJob().data, channel: 'wechat' } }));
 
       expect(mockWechatChannel.send).toHaveBeenCalled();
       expect(mockConsoleChannel.send).not.toHaveBeenCalled();

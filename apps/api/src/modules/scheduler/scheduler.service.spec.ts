@@ -116,7 +116,9 @@ describe('SchedulerService', () => {
       mockPrisma.workOrder.findMany.mockResolvedValue(overdueOrders);
       mockPrisma.schedulerRun.create.mockResolvedValue({ id: 'run-2' });
       mockPrisma.schedulerRun.update.mockResolvedValue({});
-      mockWorkOrdersService.escalate.mockResolvedValue({});
+      mockWorkOrdersService.escalate
+        .mockResolvedValueOnce({ level: RiskLevel.HIGH })
+        .mockResolvedValueOnce({ level: RiskLevel.MEDIUM });
 
       const result = await service.escalateTimeouts();
 
@@ -150,7 +152,7 @@ describe('SchedulerService', () => {
       mockPrisma.schedulerRun.create.mockResolvedValue({ id: 'run-2' });
       mockPrisma.schedulerRun.update.mockResolvedValue({});
       mockWorkOrdersService.escalate
-        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ level: RiskLevel.HIGH })
         .mockRejectedValueOnce(new Error('Not found'));
 
       const result = await service.escalateTimeouts();

@@ -1,10 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { Inject, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import {
   INotificationChannel,
-  NOTIFICATION_CHANNEL,
   SendNotificationInput,
 } from '../channels/notification-channel.interface';
 import { ConsoleChannel } from '../channels/console.channel';
@@ -16,22 +15,19 @@ interface SendJobData {
   targetId: string;
   templateId?: string;
   payload: Record<string, unknown>;
+  channel?: string;
 }
 
 @Processor('notifications')
 export class NotificationSendProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationSendProcessor.name);
-  private readonly channel: INotificationChannel;
 
   constructor(
     private readonly prisma: PrismaService,
-    consoleChannel: ConsoleChannel,
-    wechatChannel: WeChatChannel,
-    @Inject(NOTIFICATION_CHANNEL) channelName: string,
+    private readonly consoleChannel: ConsoleChannel,
+    private readonly wechatChannel: WeChatChannel,
   ) {
     super();
-    this.channel = channelName === 'wechat' ? wechatChannel : consoleChannel;
-    this.logger.log(`Notification channel: ${channelName}`);
   }
 
   async process(job: Job<SendJobData>): Promise<void> {
@@ -41,6 +37,10 @@ export class NotificationSendProcessor extends WorkerHost {
     }
 
     return this.handleSend(job);
+  }
+
+  private getChannel(channelName?: string): INotificationChannel {
+    return channelName === 'wechat' ? this.wechatChannel : this.consoleChannel;
   }
 
   private async handleSend(job: Job<SendJobData>): Promise<void> {
@@ -57,7 +57,7 @@ export class NotificationSendProcessor extends WorkerHost {
       payload,
     };
 
-    const result = await this.channel.send(input);
+    const result = await this.getChannel(job.data.channel).send(input);
 
     if (result.success) {
       await this.prisma.notification.update({

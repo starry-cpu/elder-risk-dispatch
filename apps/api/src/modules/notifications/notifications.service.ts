@@ -45,6 +45,7 @@ export class NotificationsService {
         targetId: input.targetId,
         templateId: input.templateId,
         payload: input.payload,
+        channel: notification.channel,
       },
       {
         attempts: 5,

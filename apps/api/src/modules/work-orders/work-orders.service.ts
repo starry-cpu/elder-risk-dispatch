@@ -395,7 +395,6 @@ export class WorkOrdersService {
   async escalate(id: string) {
     const wo = await this.prisma.workOrder.findUnique({
       where: { id },
-      include: { elder: { select: { district: true } } },
     });
     if (!wo) throw new NotFoundException('工单不存在');
 

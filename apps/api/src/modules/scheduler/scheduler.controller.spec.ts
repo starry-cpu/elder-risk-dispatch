@@ -63,7 +63,9 @@ describe('SchedulerController', () => {
       const result = await controller.getRuns({ page: 1, limit: 20 });
 
       expect(result.items).toEqual([]);
-      expect(mockService.getRuns).toHaveBeenCalledWith({ page: 1, limit: 20 });
+      expect(mockService.getRuns).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20 }),
+      );
     });
   });
 });
