@@ -6,16 +6,6 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { RiskScoringService } from './risk-scoring.service';
 import { RiskLevel, RiskStatus, RiskSource, Role } from '@prisma/client';
 
-interface EvaluateInput {
-  elderId: string;
-  hoursSinceLastCheckIn: number;
-  deviceAlarms: string[];
-  abnormalText: boolean;
-  age: number;
-  hasChronicDisease: boolean;
-  recentHighRisk: boolean;
-}
-
 interface Requester {
   sub: string;
   role: Role;
@@ -29,16 +19,55 @@ export class RiskService {
     private readonly scoring: RiskScoringService,
   ) {}
 
-  async evaluateAndCreateEvent(input: EvaluateInput) {
-    const result = this.scoring.evaluate(input);
+  async evaluateAndCreateEvent(input: {
+    elderId: string;
+    hoursSinceLastCheckIn?: number;
+    deviceAlarms?: string[];
+    abnormalText?: boolean;
+    age?: number;
+    hasChronicDisease?: boolean;
+    recentHighRisk?: boolean;
+  }) {
+    const elder = await this.prisma.elder.findUnique({
+      where: { id: input.elderId },
+    });
+    if (!elder) throw new NotFoundException('老人不存在');
+
+    const age = input.age ?? this.calculateAge(elder.birthDate);
+    const hasChronic = input.hasChronicDisease ?? (elder.healthTags?.length > 0);
+
+    // Check recent high risk (last 7 days)
+    let recentHighRisk = input.recentHighRisk ?? false;
+    if (!input.recentHighRisk) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const recent = await this.prisma.riskEvent.findFirst({
+        where: { elderId: input.elderId, level: RiskLevel.HIGH, createdAt: { gte: sevenDaysAgo } },
+      });
+      recentHighRisk = !!recent;
+    }
+
+    const result = this.scoring.evaluate({
+      hoursSinceLastCheckIn: input.hoursSinceLastCheckIn ?? 0,
+      deviceAlarms: input.deviceAlarms ?? [],
+      abnormalText: input.abnormalText ?? false,
+      age,
+      hasChronicDisease: hasChronic,
+      recentHighRisk,
+    });
 
     if (result.score === 0) return null;
+
+    // Determine source
+    let source: RiskSource = RiskSource.MANUAL;
+    if (input.hoursSinceLastCheckIn && input.hoursSinceLastCheckIn >= 24) source = RiskSource.MISSED_CHECKIN;
+    if (input.deviceAlarms && input.deviceAlarms.length > 0) source = RiskSource.DEVICE;
+    if (input.abnormalText) source = RiskSource.ABNORMAL_TEXT;
 
     return this.prisma.riskEvent.create({
       data: {
         elderId: input.elderId,
         level: result.level,
-        source: RiskSource.MANUAL,
+        source,
         score: result.score,
         reason: result.reason.join(','),
         status: RiskStatus.PENDING_REVIEW,
@@ -117,5 +146,14 @@ export class RiskService {
         reason: note ? `${event.reason} | 复核备注: ${note}` : event.reason,
       },
     });
+  }
+
+  private calculateAge(birthDate: Date | null): number {
+    if (!birthDate) return 0;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+    return age;
   }
 }

@@ -37,7 +37,7 @@ describe('RiskService', () => {
     elder: { findUnique: jest.fn() },
     riskEvent: {
       create: jest.fn(), findUnique: jest.fn(), findMany: jest.fn(),
-      count: jest.fn(), update: jest.fn(),
+      count: jest.fn(), update: jest.fn(), findFirst: jest.fn(),
     },
     checkIn: { findFirst: jest.fn() },
     deviceData: { findFirst: jest.fn() },
@@ -62,12 +62,11 @@ describe('RiskService', () => {
       hoursSinceLastCheckIn: 25,
       deviceAlarms: [],
       abnormalText: true,
-      age: 75,
-      hasChronicDisease: true,
-      recentHighRisk: false,
     };
 
     it('应创建 RiskEvent 并返回', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.riskEvent.findFirst.mockResolvedValue(null);
       mockScoringService.evaluate.mockReturnValue(scoringResult);
       mockPrisma.riskEvent.create.mockResolvedValue(mockRiskEvent);
 
@@ -80,11 +79,13 @@ describe('RiskService', () => {
     });
 
     it('分数为 0 时不应创建事件', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.riskEvent.findFirst.mockResolvedValue(null);
       mockScoringService.evaluate.mockReturnValue({
         score: 0, level: RiskLevel.LOW, reason: [], ruleVersion: 1,
       });
 
-      const result = await service.evaluateAndCreateEvent(input);
+      const result = await service.evaluateAndCreateEvent({ elderId: 'elder-1' });
       expect(result).toBeNull();
       expect(mockPrisma.riskEvent.create).not.toHaveBeenCalled();
     });
