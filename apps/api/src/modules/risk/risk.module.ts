@@ -1,5 +1,6 @@
 // apps/api/src/modules/risk/risk.module.ts
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { RiskController } from './risk.controller';
 import { RiskService } from './risk.service';
 import { RiskScoringService } from './risk-scoring.service';
@@ -8,6 +9,7 @@ import { RulesController } from './rules/rules.controller';
 import { RulesService } from './rules/rules.service';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [RiskController, RulesController],
   providers: [RiskScoringService, RiskService, RulesService, DispatchRecommendationService],
   exports: [RiskScoringService, RiskService, DispatchRecommendationService],
