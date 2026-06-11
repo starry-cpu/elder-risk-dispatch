@@ -13,6 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
     "@care/shared-types": "workspace:*",
     "axios": "^1.7.0",
     "dayjs": "^1.11.0",

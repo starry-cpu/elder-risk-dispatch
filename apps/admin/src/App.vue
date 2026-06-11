@@ -1,7 +1,11 @@
 <template>
-  <router-view />
+  <AppLayout v-if="authStore.isAuthenticated" />
+  <router-view v-else />
 </template>
 
 <script setup lang="ts">
-// Router will be added in Task 3
+import { useAuthStore } from '@/stores/auth';
+import AppLayout from '@/components/layout/AppLayout.vue';
+
+const authStore = useAuthStore();
 </script>
