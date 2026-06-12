@@ -2,10 +2,11 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Admin Core Flows', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.evaluate(() => {
+    // Seed localStorage before navigation so the auth store reads it at init time
+    await page.addInitScript(() => {
       localStorage.setItem('token', 'test-token-e2e');
     });
+    await page.goto('/login');
   });
 
   test('dashboard loads with stat cards and charts', async ({ page }) => {

@@ -15,5 +15,5 @@
     "types": ["@dcloudio/types"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
-  "exclude": ["__tests__"]
+  "exclude": ["src/**/__tests__"]
 }

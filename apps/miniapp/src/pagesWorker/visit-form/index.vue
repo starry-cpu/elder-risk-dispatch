@@ -18,8 +18,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useVisitForm } from '@/composables/useVisitForm';
-const { photos, submitting, MAX_PHOTOS, validate, addPhoto, removePhoto } = useVisitForm();
+const { photos, submitting, MAX_PHOTOS, validate, addPhoto, removePhoto, clearPhotos } = useVisitForm();
 const elderId = ref(''); const observation = ref(''); const note = ref('');
+function resetForm() { elderId.value = ''; observation.value = ''; note.value = ''; clearPhotos(); }
 function takePhoto() { uni.chooseImage({ count: 1, success: (res: any) => { addPhoto(res.tempFilePaths[0]); } }); }
-function handleSubmit() { const result = validate({ elderId: elderId.value, observation: observation.value }); if (!result.valid) { uni.showToast({ title: result.message || '请完善表单', icon: 'none' }); return; } submitting.value = true; uni.request({ url: '/api/v1/visits', method: 'POST', data: { elderId: elderId.value, observation: observation.value, photos: photos.value, note: note.value }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, complete: () => { submitting.value = false; }, success: () => { uni.showToast({ title: '提交成功' }); elderId.value = ''; observation.value = ''; } }); }
+function handleSubmit() { const result = validate({ elderId: elderId.value, observation: observation.value }); if (!result.valid) { uni.showToast({ title: result.message || '请完善表单', icon: 'none' }); return; } submitting.value = true; uni.request({ url: '/api/v1/visits', method: 'POST', data: { elderId: elderId.value, observation: observation.value, photos: photos.value, note: note.value }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, complete: () => { submitting.value = false; }, success: () => { uni.showToast({ title: '提交成功' }); resetForm(); } }); }
 </script>

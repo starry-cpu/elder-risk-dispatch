@@ -22,6 +22,6 @@ const textContent = ref('');
 const elderId = ref(uni.getStorageSync('elderId') || '');
 function submitCheckIn(method: string) { const result = validate({ elderId: elderId.value, method, content: method === 'TEXT' ? textContent.value : undefined, voiceUrl: undefined }); if (!result.valid) { uni.showToast({ title: result.message || '请完善信息', icon: 'none' }); return; } uni.request({ url: '/api/v1/check-ins', method: 'POST', data: { elderId: elderId.value, method, content: method === 'TEXT' ? textContent.value : undefined }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '已报平安 ✅' }); textContent.value = ''; } }); }
 function startVoice() { startRecording(); uni.showToast({ title: '开始录音', icon: 'none', duration: 500 }); }
-function stopVoice() { stopRecording(); uni.showToast({ title: `已录制 ${duration.value}s`, icon: 'success' }); }
+function stopVoice() { stopRecording(); if (duration.value < 1) { uni.showToast({ title: '录音时间太短', icon: 'none' }); return; } // Submit VOICE check-in with placeholder voiceUrl (see TODO in sos/index.vue) const tempUrl = 'recorded_audio_' + Date.now(); uni.request({ url: '/api/v1/check-ins', method: 'POST', data: { elderId: elderId.value, method: 'VOICE', content: '语音报平安', voiceUrl: tempUrl }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '已报平安 ✅' }); } }); }
 </script>
 <style scoped>.checkin-btn { min-height: 120rpx; transition: opacity 0.15s; }</style>

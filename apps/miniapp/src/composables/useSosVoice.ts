@@ -9,6 +9,11 @@ export function useSosVoice() {
   let timer: ReturnType<typeof setInterval> | null = null;
 
   function startRecording() {
+    // Clear any existing timer to prevent duplicate interval leaks
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
     isRecording.value = true;
     duration.value = 0;
     timer = setInterval(() => {

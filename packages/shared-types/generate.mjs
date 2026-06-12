@@ -7,14 +7,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OPENAPI_URL =
   process.env.OPENAPI_URL || 'http://localhost:3000/api/docs-json';
 
-const bin = resolve(__dirname, 'node_modules', '.bin', 'openapi-typescript');
 const outputPath = resolve(__dirname, 'src', 'index.ts');
 
 console.log(`Fetching OpenAPI spec from ${OPENAPI_URL}...`);
 
 try {
+  // Use pnpm exec for cross-platform binary resolution (works on Windows, pnpm hoisting, etc.)
   execSync(
-    `"${bin}" "${OPENAPI_URL}" -o "${outputPath}"`,
+    `pnpm exec openapi-typescript "${OPENAPI_URL}" -o "${outputPath}"`,
     { stdio: 'inherit', cwd: __dirname }
   );
   console.log(`Types generated successfully to ${outputPath}`);

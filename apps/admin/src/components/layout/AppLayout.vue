@@ -25,16 +25,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Bell } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth';
+import { useWebSocket } from '@/composables/useWebSocket';
 import SidebarMenu from './SidebarMenu.vue';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const newRiskCount = ref(0);
+
+// TODO: Wire real WebSocket gateway events once the backend Socket.IO gateway
+// is fully integrated (currently connects to VITE_WS_URL or localhost:3000).
+// Expected flow: socket emits 'risk:new' with count → update newRiskCount.
+const { connected, on, off } = useWebSocket('/dashboard');
+onMounted(() => {
+  on('risk:new', (data: any) => {
+    newRiskCount.value = data?.count ?? data ?? 0;
+  });
+});
+onUnmounted(() => {
+  off('risk:new');
+});
 
 function handleLogout() {
   authStore.logout();
