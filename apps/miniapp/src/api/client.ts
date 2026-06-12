@@ -24,7 +24,7 @@ http.interceptors.response.use(
     return response;
   },
   (error) => {
-    const msg = (error as Error).message || '网络错误';
+    const msg = (error as unknown as Error).message || '网络错误';
     uni.showToast({ title: msg, icon: 'none' });
     return Promise.reject(error);
   }
