@@ -16,7 +16,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 const note = ref(''); const event = ref<any>(null);
-onMounted(() => { const pages = getCurrentPages(); const id = (pages[pages.length - 1] as any)?.options?.id; if (id) { uni.request({ url: `/api/v1/risk/events?id=${id}`, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: (res: any) => { if (res.data?.data?.items?.[0]) event.value = res.data.data.items[0]; } }); } });
+onMounted(() => { const pages = getCurrentPages(); const id = (pages[pages.length - 1] as any)?.options?.id; if (id) { uni.request({ url: `/api/v1/risk/events/${id}`, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: (res: any) => { if (res.data?.data) event.value = res.data.data; } }); } });
 function submitReview(status: string) { if (!event.value) return; if (event.value.level === 'HIGH' && !note.value.trim()) { uni.showToast({ title: '高风险事件必须填写复核备注', icon: 'none' }); return; } uni.request({ url: `/api/v1/risk/events/${event.value.id}/review`, method: 'POST', data: { status, note: note.value }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: status === 'CONFIRMED' ? '已确认' : '已忽略' }); setTimeout(() => uni.navigateBack(), 1000); } }); }
 function handleConfirm() { submitReview('CONFIRMED'); }
 function handleIgnore() { submitReview('IGNORED'); }

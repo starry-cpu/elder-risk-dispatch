@@ -23,7 +23,7 @@ const isHighRisk = computed(() => props.event?.level === 'HIGH');
 const title = computed(() => props.action === 'confirm' ? '确认预警' : '忽略预警');
 const actionType = computed(() => props.action === 'confirm' ? 'primary' : 'danger');
 const actionLabel = computed(() => props.action === 'confirm' ? '确认' : '忽略');
-const rules: FormRules = { note: [{ required: isHighRisk.value, message: '高风险事件必须填写复核备注', trigger: 'blur' }] };
+const rules: FormRules = { note: [{ validator: (rule, value, callback) => { if (isHighRisk.value && !value?.trim()) { callback(new Error('高风险事件必须填写复核备注')); } else { callback(); } }, trigger: 'blur' }] };
 function resetForm() { form.value.note = ''; formRef.value?.resetFields(); }
 async function submit() {
   const valid = await formRef.value?.validate().catch(() => false);

@@ -1,5 +1,5 @@
+// Worker-facing transitions (backend has no ACCEPT — use START/COMPLETE)
 const TRANSITIONS: Record<string, string[]> = {
-  PENDING: ['ACCEPT'],
   ASSIGNED: ['START'],
   IN_PROGRESS: ['COMPLETE'],
   COMPLETED: [],

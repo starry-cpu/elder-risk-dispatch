@@ -10,7 +10,7 @@
         <el-table-column label="匹配分" width="80" prop="score" />
       </el-table>
     </div>
-    <el-form v-if="isReassign" :model="form" :rules="rules" label-position="top">
+    <el-form v-if="isReassign" ref="formRef" :model="form" :rules="rules" label-position="top">
       <el-form-item label="改派原因" prop="reason"><el-input v-model="form.reason" type="textarea" :rows="2" placeholder="请填写改派原因" /></el-form-item>
     </el-form>
     <div v-if="selected" class="mt-2 text-sm">已选择: <el-tag>{{ selected.assignee.name }}</el-tag></div>
@@ -22,15 +22,16 @@
 </template>
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
-import type { FormRules } from 'element-plus';
+import type { FormInstance, FormRules } from 'element-plus';
 import type { DispatchRecommendation } from '@/api/work-orders';
 const props = defineProps<{ visible: boolean; isReassign: boolean; recommendations: DispatchRecommendation[]; }>();
 const emit = defineEmits<{ 'update:visible': [value: boolean]; submit: [assigneeId: string, reason?: string]; }>();
+const formRef = ref<FormInstance>();
 const selected = ref<DispatchRecommendation | null>(null);
 const submitting = ref(false);
 const form = reactive({ reason: '' });
 const rules: FormRules = { reason: [{ required: true, message: '请填写改派原因', trigger: 'blur' }] };
 watch(() => props.visible, (v) => { if (!v) { selected.value = null; form.reason = ''; } });
 function selectRec(rec: DispatchRecommendation) { selected.value = rec; }
-async function handleSubmit() { if (!selected.value) return; submitting.value = true; try { emit('submit', selected.value.assignee.id, form.reason || undefined); } finally { submitting.value = false; } }
+async function handleSubmit() { if (!selected.value) return; if (props.isReassign && formRef.value) { const valid = await formRef.value.validate().catch(() => false); if (!valid) return; } submitting.value = true; try { emit('submit', selected.value.assignee.id, form.reason || undefined); } finally { submitting.value = false; } }
 </script>

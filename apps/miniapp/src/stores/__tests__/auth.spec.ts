@@ -20,7 +20,7 @@ describe('useAuthStore (miniapp)', () => {
     store.setToken('test-token');
     expect(store.isAuthenticated).toBe(true);
   });
-  it('login sets token from wechat code', async () => {
+  it('has loading state initialized to false', async () => {
     const store = useAuthStore();
     expect(store.loading).toBe(false);
   });

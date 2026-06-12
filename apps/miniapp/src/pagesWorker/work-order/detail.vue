@@ -16,12 +16,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { useWorkOrderFlow } from '@/composables/useWorkOrderFlow';
 import { TYPE_LABELS, STATUS_LABELS } from '@/composables/useOrderProgress';
-const { getAvailableActions } = useWorkOrderFlow();
+const { getAvailableActions, validateCompletion } = useWorkOrderFlow();
 const order = ref<any>(null); const timeline = ref<any[]>([]); const resultText = ref(''); const resultDialogVisible = ref(false);
 const availableActions = computed(() => order.value ? getAvailableActions(order.value.status) : []);
-const actionLabels: Record<string, string> = { ACCEPT: '接单', START: '开始处理', COMPLETE: '完成' };
+const actionLabels: Record<string, string> = { START: '开始处理', COMPLETE: '完成' };
+const actionRoute: Record<string, string> = { START: 'start', COMPLETE: 'complete' };
 function loadDetail() { const pages = getCurrentPages(); const id = (pages[pages.length - 1] as any)?.options?.id; if (!id) return; const token = uni.getStorageSync('token'); uni.request({ url: `/api/v1/work-orders/${id}`, header: { Authorization: `Bearer ${token}` }, success: (res: any) => { if (res.data?.data) order.value = res.data.data; } }); uni.request({ url: `/api/v1/work-orders/${id}/timeline`, header: { Authorization: `Bearer ${token}` }, success: (res: any) => { if (res.data?.data) timeline.value = res.data.data; } }); }
-function handleAction(action: string) { if (action === 'COMPLETE') { resultDialogVisible.value = true; return; } if (!order.value) return; uni.request({ url: `/api/v1/work-orders/${order.value.id}/${action.toLowerCase()}`, method: 'POST', header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '操作成功' }); loadDetail(); } }); }
-function submitResult() { if (!order.value) return; uni.request({ url: `/api/v1/work-orders/${order.value.id}/complete`, method: 'POST', data: { result: resultText.value }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '已完成' }); resultDialogVisible.value = false; loadDetail(); } }); }
+function handleAction(action: string) { if (action === 'COMPLETE') { resultDialogVisible.value = true; return; } if (!order.value) return; const route = actionRoute[action] || action.toLowerCase(); uni.request({ url: `/api/v1/work-orders/${order.value.id}/${route}`, method: 'POST', header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '操作成功' }); loadDetail(); } }); }
+function submitResult() { if (!order.value) return; const validation = validateCompletion(resultText.value); if (!validation.valid) { uni.showToast({ title: validation.message || '请填写处理结果', icon: 'none' }); return; } uni.request({ url: `/api/v1/work-orders/${order.value.id}/complete`, method: 'POST', data: { result: resultText.value }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '已完成' }); resultDialogVisible.value = false; loadDetail(); } }); }
 onMounted(() => { loadDetail(); });
 </script>

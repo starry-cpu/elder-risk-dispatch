@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { useWorkOrderFlow } from '../useWorkOrderFlow';
 
 describe('useWorkOrderFlow', () => {
-  it('returns available actions for PENDING status', () => {
+  it('returns empty actions for PENDING status (worker does not interact with unassigned)', () => {
     const { getAvailableActions } = useWorkOrderFlow();
-    expect(getAvailableActions('PENDING')).toContain('ACCEPT');
+    expect(getAvailableActions('PENDING')).toHaveLength(0);
   });
   it('returns available actions for ASSIGNED status', () => {
     const { getAvailableActions } = useWorkOrderFlow();
@@ -22,10 +22,10 @@ describe('useWorkOrderFlow', () => {
     const { getAvailableActions } = useWorkOrderFlow();
     expect(getAvailableActions('CANCELLED')).toHaveLength(0);
   });
-  it('validates ACCEPT requires PENDING status', () => {
+  it('validates START requires ASSIGNED status', () => {
     const { canPerformAction } = useWorkOrderFlow();
-    expect(canPerformAction('PENDING', 'ACCEPT')).toBe(true);
-    expect(canPerformAction('IN_PROGRESS', 'ACCEPT')).toBe(false);
+    expect(canPerformAction('ASSIGNED', 'START')).toBe(true);
+    expect(canPerformAction('IN_PROGRESS', 'START')).toBe(false);
   });
   it('validates COMPLETE requires result text', () => {
     const { validateCompletion } = useWorkOrderFlow();

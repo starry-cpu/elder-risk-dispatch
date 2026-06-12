@@ -81,7 +81,7 @@ elder-risk-dispatch/
 | **API 层统一** | 两端的 HTTP 层都从 `@care/shared-types` 导入类型，API 调用签名类型安全 |
 | **逻辑下沉** | composable/store 不依赖 `uni` 或 DOM，纯 TS 可单独单测 |
 | **角色隔离** | 小程序通过 uni-app subpackage 条件编译，编译产物按 role 分离 |
-| **类型生成** | `openapi-typescript` 脚本从 `http://localhost:3000/api-json` 拉取 OpenAPI JSON 生成 TS 类型到 `shared-types/` |
+| **类型生成** | `openapi-typescript` 脚本从 `http://localhost:3000/api/docs-json` 拉取 OpenAPI JSON 生成 TS 类型到 `shared-types/src/index.ts` |
 
 ---
 
@@ -255,13 +255,13 @@ api/
 [apps/api]  NestJS Swagger 装饰器
      │
      ▼
-  http://localhost:3000/api-json   (OpenAPI 3.0 JSON)
+  http://localhost:3000/api/docs-json   (OpenAPI 3.0 JSON)
      │
      ▼  packages/shared-types/generate.mjs
-     │  npx openapi-typescript <url> -o index.ts
+     │  npx openapi-typescript <url> -o src/index.ts
      │
      ▼
-  packages/shared-types/index.ts   (纯净 TS interface/type)
+  packages/shared-types/src/index.ts   (纯净 TS interface/type，已提交到仓库)
      │
      ├──▶  apps/admin     import type { ... } from '@care/shared-types'
      └──▶  apps/miniapp   import type { ... } from '@care/shared-types'
@@ -269,9 +269,9 @@ api/
 
 ### 5.2 generate.mjs 脚本逻辑
 
-1. 从后端地址拉取 OpenAPI JSON（或读本地文件 `apps/api/openapi.json`）
+1. 从后端地址 `http://localhost:3000/api/docs-json` 拉取 OpenAPI JSON
 2. 调用 `openapi-typescript` 生成 TS 类型
-3. 输出到 `packages/shared-types/index.ts`
+3. 输出到 `packages/shared-types/src/index.ts`（已提交到仓库，clean checkout 可用）
 4. npm script: `"generate:types"` → `pnpm --filter @care/shared-types generate`
 
 ### 5.3 CI 集成

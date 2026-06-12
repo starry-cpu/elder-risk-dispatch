@@ -5,31 +5,21 @@ import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OPENAPI_URL =
-  process.env.OPENAPI_URL || 'http://localhost:3000/api-json';
+  process.env.OPENAPI_URL || 'http://localhost:3000/api/docs-json';
 
 const bin = resolve(__dirname, 'node_modules', '.bin', 'openapi-typescript');
+const outputPath = resolve(__dirname, 'src', 'index.ts');
 
 console.log(`Fetching OpenAPI spec from ${OPENAPI_URL}...`);
 
 try {
   execSync(
-    `"${bin}" "${OPENAPI_URL}" -o index.ts`,
+    `"${bin}" "${OPENAPI_URL}" -o "${outputPath}"`,
     { stdio: 'inherit', cwd: __dirname }
   );
-  console.log('Types generated successfully to packages/shared-types/index.ts');
+  console.log(`Types generated successfully to ${outputPath}`);
 } catch (err) {
-  console.error(`Primary generation failed: ${err.message}`);
-  console.error('Trying fallback with local file...');
-
-  try {
-    execSync(
-      `"${bin}" ../../apps/api/openapi.json -o index.ts`,
-      { stdio: 'inherit', cwd: __dirname }
-    );
-    console.log('Types generated from local spec.');
-  } catch (fallbackErr) {
-    console.error(`Fallback generation also failed: ${fallbackErr.message}`);
-    console.error('Ensure the API server is running or apps/api/openapi.json exists.');
-    process.exitCode = 1;
-  }
+  console.error(`Generation failed: ${err.message}`);
+  console.error('Ensure the API server is running at http://localhost:3000/api/docs-json');
+  process.exitCode = 1;
 }
