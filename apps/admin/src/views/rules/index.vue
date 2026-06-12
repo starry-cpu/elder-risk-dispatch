@@ -104,7 +104,7 @@ function load() {
   rulesApi
     .list()
     .then((res) => {
-      rules.value = res.data.data;
+      rules.value = res.data.data.items ?? [];
     })
     .finally(() => {
       loading.value = false;

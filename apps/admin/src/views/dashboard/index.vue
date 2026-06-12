@@ -1,37 +1,38 @@
 <template>
-  <div class="space-y-6">
+  <div v-loading="store.loading" class="space-y-6">
     <!-- Stat Cards -->
     <el-row :gutter="16">
       <el-col :span="6">
-        <StatCard label="重点老人" :value="store.overview.keyElderCount" color="#e6a23c" suffix="人" />
+        <StatCard label="重点老人" :value="store.keyElderCount" color="#e6a23c" suffix="人" />
       </el-col>
       <el-col :span="6">
-        <StatCard label="待处理预警" :value="store.overview.pendingRiskCount" color="#f56c6c" suffix="条" />
+        <StatCard label="待处理预警" :value="store.pendingRiskCount" color="#f56c6c" suffix="条" />
       </el-col>
       <el-col :span="6">
-        <StatCard label="今日工单完成率" :value="`${store.overview.todayCompletionRate}%`" color="#67c23a" />
+        <StatCard label="今日工单完成率" :value="`${store.todayCompletionRate}%`" color="#67c23a" />
       </el-col>
       <el-col :span="6">
-        <StatCard label="近期差评" :value="store.overview.poorReviewCount" color="#909399" suffix="条" />
+        <StatCard label="超期工单" :value="store.poorReviewCount" color="#909399" suffix="条" />
       </el-col>
     </el-row>
 
-    <!-- Charts -->
+    <!-- Charts Row 1 -->
     <el-row :gutter="16">
       <el-col :span="12">
-        <ChartCard title="风险分布" :option="riskPieOption" chart-height="300px" />
+        <ChartCard title="风险等级分布" :option="riskLevelOption" chart-height="300px" />
       </el-col>
       <el-col :span="12">
-        <ChartCard title="响应时长趋势" :option="responseTimeOption" chart-height="300px" />
+        <ChartCard title="风险趋势" :option="riskTrendOption" chart-height="300px" />
       </el-col>
     </el-row>
 
+    <!-- Charts Row 2 -->
     <el-row :gutter="16">
       <el-col :span="12">
-        <ChartCard title="高发问题" :option="hotspotsOption" chart-height="300px" />
+        <ChartCard title="风险来源分布" :option="riskSourceOption" chart-height="300px" />
       </el-col>
       <el-col :span="12">
-        <ChartCard title="差评分析" :option="poorReviewsOption" chart-height="300px" />
+        <ChartCard title="工单状态分布" :option="orderStatusOption" chart-height="300px" />
       </el-col>
     </el-row>
   </div>
@@ -46,46 +47,59 @@ import ChartCard from '@/components/common/ChartCard.vue';
 
 const store = useDashboardStore();
 
-const riskPieOption = computed<EChartsOption>(() => ({
+const levelLabelMap: Record<string, string> = {
+  HIGH: '高风险',
+  MEDIUM: '中风险',
+  LOW: '低风险',
+};
+
+const riskLevelOption = computed<EChartsOption>(() => ({
   tooltip: { trigger: 'item' },
   legend: { bottom: 0 },
   series: [{
     type: 'pie',
     radius: ['40%', '70%'],
-    data: [
-      { value: store.riskDistribution.high, name: '高风险' },
-      { value: store.riskDistribution.medium, name: '中风险' },
-      { value: store.riskDistribution.low, name: '低风险' },
-    ],
+    data: (store.riskOverview?.byLevel ?? []).map(item => ({
+      value: item.count,
+      name: levelLabelMap[item.level] ?? item.level,
+    })),
     emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } },
   }],
 }));
 
-const responseTimeOption = computed<EChartsOption>(() => ({
+const riskTrendOption = computed<EChartsOption>(() => ({
   tooltip: { trigger: 'axis' },
-  xAxis: { type: 'category', data: store.responseTimeTrend.map(r => r.date) },
-  yAxis: { type: 'value', name: '分钟' },
+  xAxis: { type: 'category', data: (store.riskOverview?.trend ?? []).map(t => t.date) },
+  yAxis: { type: 'value', name: '条' },
   series: [{
     type: 'line',
-    data: store.responseTimeTrend.map(r => r.avgMinutes),
+    data: (store.riskOverview?.trend ?? []).map(t => t.count),
     smooth: true,
     areaStyle: { opacity: 0.3 },
   }],
 }));
 
-const hotspotsOption = computed<EChartsOption>(() => ({
+const riskSourceOption = computed<EChartsOption>(() => ({
   tooltip: { trigger: 'axis' },
-  xAxis: { type: 'category', data: store.hotspots.map(h => h.category) },
+  xAxis: { type: 'category', data: (store.riskOverview?.bySource ?? []).map(s => s.source) },
   yAxis: { type: 'value' },
-  series: [{ type: 'bar', data: store.hotspots.map(h => h.count) }],
+  series: [{ type: 'bar', data: (store.riskOverview?.bySource ?? []).map(s => s.count) }],
 }));
 
-const poorReviewsOption = computed<EChartsOption>(() => ({
+const orderStatusOption = computed<EChartsOption>(() => ({
   tooltip: { trigger: 'axis' },
-  xAxis: { type: 'category', data: store.poorReviews.map(p => p.category) },
+  xAxis: { type: 'category', data: (store.workOrderEfficiency?.byStatus ?? []).map(s => statusLabelMap[s.status] ?? s.status) },
   yAxis: { type: 'value' },
-  series: [{ type: 'bar', data: store.poorReviews.map(p => p.count), color: '#f56c6c' }],
+  series: [{ type: 'bar', data: (store.workOrderEfficiency?.byStatus ?? []).map(s => s.count), color: '#409eff' }],
 }));
+
+const statusLabelMap: Record<string, string> = {
+  PENDING: '待分配',
+  ASSIGNED: '已分配',
+  IN_PROGRESS: '处理中',
+  COMPLETED: '已完成',
+  CANCELLED: '已取消',
+};
 
 onMounted(() => {
   store.fetchAll();

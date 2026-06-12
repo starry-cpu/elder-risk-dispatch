@@ -33,7 +33,11 @@ const recommendations = ref<DispatchRecommendation[]>([]);
 const timelineVisible = ref(false);
 const timelineData = ref<Array<{ id: string; action: string; note?: string; createdAt: string }>>([]);
 
-function load() { store.fetchList({ page: page.value, limit: limit.value, ...filters }); }
+function load() {
+  const params: { page: number; limit: number; status?: string } = { page: page.value, limit: limit.value };
+  if (filters.status) params.status = filters.status;
+  store.fetchList(params);
+}
 async function openAssign(order: WorkOrderRecord, reassign: boolean) { selectedOrder.value = order; isReassign.value = reassign; recommendations.value = await store.fetchRecommendations(order.id); assignVisible.value = true; }
 async function handleAssignSubmit(assigneeId: string, reason?: string) {
   if (!selectedOrder.value) return;

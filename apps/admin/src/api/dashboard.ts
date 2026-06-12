@@ -1,41 +1,62 @@
 import client from './client';
 
-export interface DashboardOverview {
-  keyElderCount: number;
-  pendingRiskCount: number;
-  todayCompletionRate: number;
-  poorReviewCount: number;
+// === Risk Overview (GET /dashboard/risk-overview) ===
+export interface RiskOverview {
+  byLevel: Array<{ level: string; count: number }>;
+  bySource: Array<{ source: string; count: number }>;
+  trend: Array<{ date: string; count: number }>;
+  total: number;
+  periodDays: number;
 }
 
-export interface RiskDistribution {
-  high: number;
-  medium: number;
-  low: number;
+// === Work Order Efficiency (GET /dashboard/work-order-efficiency) ===
+export interface WorkOrderEfficiency {
+  byStatus: Array<{ status: string; count: number }>;
+  byType: Array<{ type: string; count: number }>;
+  avgCompletionHours: number;
+  overdueCount: number;
+  total: number;
 }
 
-export interface ResponseTimeTrend {
-  date: string;
-  avgMinutes: number;
+// === Elder Coverage (GET /dashboard/elder-coverage) ===
+export interface ElderCoverage {
+  byDistrict: Array<{ district: string; total: number; checkedIn: number; rate: number }>;
+  todayCheckInRate: number;
+  weekCheckInRate: number;
+  abnormalRate: number;
+  highRiskElders: Array<{
+    elderId: string;
+    name: string;
+    district: string;
+    serviceLevel: string;
+    latestRiskLevel: string | null;
+    lastCheckIn: string | null;
+  }>;
 }
 
-export interface Hotspot {
-  category: string;
-  count: number;
+// === Grid Worker Performance (GET /dashboard/grid-worker-performance) ===
+export interface GridWorkerPerformance {
+  workers: Array<{
+    userId: string;
+    name: string;
+    role: string;
+    district: string;
+    dutyStatus: string;
+    completedOrders: number;
+    avgResponseHours: number;
+  }>;
 }
 
 export const dashboardApi = {
-  getOverview: () =>
-    client.get<{ data: DashboardOverview }>('/dashboard/overview'),
+  getRiskOverview: (params?: { period?: string }) =>
+    client.get<{ data: RiskOverview }>('/dashboard/risk-overview', { params }),
 
-  getResponseTime: () =>
-    client.get<{ data: ResponseTimeTrend[] }>('/dashboard/response-time'),
+  getWorkOrderEfficiency: (params?: { period?: string }) =>
+    client.get<{ data: WorkOrderEfficiency }>('/dashboard/work-order-efficiency', { params }),
 
-  getRiskDistribution: () =>
-    client.get<{ data: RiskDistribution }>('/dashboard/risk-distribution'),
+  getElderCoverage: () =>
+    client.get<{ data: ElderCoverage }>('/dashboard/elder-coverage'),
 
-  getHotspots: () =>
-    client.get<{ data: Hotspot[] }>('/dashboard/hotspots'),
-
-  getPoorReviews: () =>
-    client.get<{ data: Hotspot[] }>('/dashboard/poor-reviews'),
+  getGridWorkerPerformance: () =>
+    client.get<{ data: GridWorkerPerformance }>('/dashboard/grid-worker-performance'),
 };
