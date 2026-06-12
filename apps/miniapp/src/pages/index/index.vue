@@ -27,15 +27,28 @@ async function enterApp() {
     if (!auth.user) {
       await auth.fetchUser();
     }
+
     if (auth.isWorker) {
       uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
     } else if (auth.isElder) {
       uni.redirectTo({ url: '/pagesElder/check-in/index' });
     } else {
-      uni.showToast({ title: '未知角色，请联系管理员', icon: 'none' });
+      // 调试：显示实际角色信息
+      const role = auth.user?.role || '无';
+      uni.showToast({
+        title: `未知角色(${role})，请联系管理员`,
+        icon: 'none',
+        duration: 3000,
+      });
     }
   } catch {
-    // 未登录则触发微信登录
+    // fetchUser 失败（如 token 过期），fall through 到微信登录
+    if (auth.isAuthenticated) {
+      // token 有效但 fetchUser 网络错误，提示用户重试
+      uni.showToast({ title: '网络异常，请重试', icon: 'none' });
+      return;
+    }
+    // token 无效或不存在，触发微信登录
     try {
       const { code } = await uniLogin();
       await auth.login(code);
@@ -43,6 +56,13 @@ async function enterApp() {
         uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
       } else if (auth.isElder) {
         uni.redirectTo({ url: '/pagesElder/check-in/index' });
+      } else {
+        const role = auth.user?.role || '无';
+        uni.showToast({
+          title: `未知角色(${role})，请联系管理员`,
+          icon: 'none',
+          duration: 3000,
+        });
       }
     } catch (e: any) {
       uni.showToast({ title: e?.message || '登录失败', icon: 'none' });
@@ -61,7 +81,17 @@ function uniLogin(): Promise<{ code: string }> {
   });
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // 有 token 但无 user → 先拉取用户信息
+  if (auth.isAuthenticated && !auth.user) {
+    try {
+      await auth.fetchUser();
+    } catch {
+      // token 过期，清除后等待用户手动点击
+      auth.logout();
+      return;
+    }
+  }
   // 已登录用户直接跳转
   if (auth.isAuthenticated && auth.user) {
     if (auth.isWorker) {

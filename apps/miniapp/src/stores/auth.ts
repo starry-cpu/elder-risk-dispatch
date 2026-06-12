@@ -29,14 +29,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchUser() {
-    try {
-      const { authApi } = await import('@/api/auth');
-      const res = await authApi.getMe();
-      const data = (res as any)?.data?.data;
-      if (data) setUser(data);
-    } catch {
-      logout(); // clear stale token so isAuthenticated becomes false
-    }
+    const { authApi } = await import('@/api/auth');
+    const res = await authApi.getMe();
+    const data = (res as any)?.data?.data;
+    if (data) setUser(data);
   }
 
   return { token, user, loading, isAuthenticated, isWorker, isElder, setToken, setUser, logout, login, fetchUser };
