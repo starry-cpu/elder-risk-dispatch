@@ -33,6 +33,23 @@ export default [
     },
   },
   {
+    files: ['apps/admin/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+  },
+  {
+    files: ['apps/miniapp/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        uni: 'readonly',
+      },
+    },
+  },
+  {
     files: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
     languageOptions: {
       globals: {

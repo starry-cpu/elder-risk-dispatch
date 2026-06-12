@@ -11,8 +11,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { TYPE_LABELS } from '@/composables/useOrderProgress';
+import { workOrdersApi } from '@/api/work-orders';
 const activeTab = ref('ASSIGNED'); const orders = ref<any[]>([]);
-function loadData() { uni.request({ url: '/api/v1/work-orders', data: { status: activeTab.value }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: (res: any) => { if (res.data?.data?.items) orders.value = res.data.data.items; } }); }
+async function loadData() {
+  try {
+    const res = await workOrdersApi.list({ status: activeTab.value });
+    const data = (res as any)?.data?.data;
+    if (data?.items) orders.value = data.items;
+  } catch { /* client interceptor already shows toast */ }
+}
 function goToDetail(o: any) { uni.navigateTo({ url: `/pagesWorker/work-order/detail?id=${o.id}` }); }
 onMounted(() => { loadData(); });
 </script>
