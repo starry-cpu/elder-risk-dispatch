@@ -1,4 +1,4 @@
-const TYPE_LABELS: Record<string, string> = {
+export const TYPE_LABELS: Record<string, string> = {
   HEALTH: '健康服务',
   LIFE: '生活照料',
   REPAIR: '维修服务',
@@ -7,7 +7,7 @@ const TYPE_LABELS: Record<string, string> = {
   ERRAND: '代购服务',
 };
 
-const STATUS_LABELS: Record<string, string> = {
+export const STATUS_LABELS: Record<string, string> = {
   PENDING: '待分配',
   ASSIGNED: '已分配',
   IN_PROGRESS: '处理中',
