@@ -25,7 +25,8 @@
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "照护调度",
-    "navigationBarBackgroundColor": "#F8F8F8",
-    "backgroundColor": "#F8F8F8"
+    "navigationBarBackgroundColor": "#F7F3ED",
+    "backgroundColor": "#F7F3ED",
+    "navigationStyle": "custom"
   }
 }
