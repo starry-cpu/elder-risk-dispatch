@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { authApi } from '@/api/auth';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(uni.getStorageSync('token') || '');
@@ -19,7 +20,6 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(code: string) {
     loading.value = true;
     try {
-      const { authApi } = await import('@/api/auth');
       const res = await authApi.wechatLogin(code);
       const data = (res as any)?.data?.data;
       if (data?.token) setToken(data.token);
@@ -30,7 +30,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchUser() {
-    const { authApi } = await import('@/api/auth');
     const res = await authApi.getMe();
     const data = (res as any)?.data?.data;
     if (data) setUser(data);
