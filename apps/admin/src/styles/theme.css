@@ -1,0 +1,397 @@
+/* ═══════════════════════════════════════════════════════════
+   「静谧权威」— 社区照护调度系统主题
+   日式极简 + 温暖专业
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
+/* ── CSS Variables ── */
+:root {
+  /* Brand */
+  --brand-gold: #b8860b;
+  --brand-gold-light: #d4a535;
+  --brand-gold-soft: #fef7e6;
+  --brand-ink: #1a1f2e;
+  --brand-ink-light: #2d3548;
+
+  /* Surfaces */
+  --surface-paper: #faf8f5;
+  --surface-card: #ffffff;
+  --surface-sidebar: #1a1f2e;
+
+  /* Text */
+  --text-primary: #2c2c2c;
+  --text-secondary: #6b6b6b;
+  --text-muted: #999999;
+  --text-sidebar: #a8b0c0;
+  --text-sidebar-active: #e8d5a3;
+
+  /* Functional */
+  --color-success: #6b8f71;
+  --color-warning: #d4956a;
+  --color-danger: #c4554d;
+  --color-info: #7b8fa1;
+
+  /* Borders */
+  --border-color: #e8e4db;
+  --border-light: #f0ede6;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.06);
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Font families */
+  --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', 'STSong', serif;
+  --font-body: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+
+  /* ── Element Plus overrides ── */
+
+  /* Primary */
+  --el-color-primary: #b8860b;
+  --el-color-primary-light-3: #d4a535;
+  --el-color-primary-light-5: #e2bf5a;
+  --el-color-primary-light-7: #f0da8e;
+  --el-color-primary-light-8: #f7e8b8;
+  --el-color-primary-light-9: #fdf5e1;
+  --el-color-primary-dark-2: #936a09;
+
+  /* Success (sage green) */
+  --el-color-success: #6b8f71;
+  --el-color-success-light-3: #8aa88f;
+  --el-color-success-light-5: #a8c0ac;
+  --el-color-success-light-7: #c5d6c8;
+  --el-color-success-light-9: #e8f0e9;
+
+  /* Warning (terracotta) */
+  --el-color-warning: #d4956a;
+  --el-color-warning-light-3: #deac8a;
+  --el-color-warning-light-5: #e8c3a8;
+  --el-color-warning-light-7: #f2d9c6;
+  --el-color-warning-light-9: #faf0e8;
+
+  /* Danger (clay red) */
+  --el-color-danger: #c4554d;
+  --el-color-danger-light-3: #d17a74;
+  --el-color-danger-light-5: #de9e99;
+  --el-color-danger-light-7: #ebc2bf;
+  --el-color-danger-light-9: #f7e8e7;
+
+  /* Info (slate) */
+  --el-color-info: #7b8fa1;
+  --el-color-info-light-3: #99a8b7;
+  --el-color-info-light-5: #b5c1cc;
+  --el-color-info-light-7: #d1d9e0;
+  --el-color-info-light-9: #edf0f3;
+
+  /* Backgrounds */
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #faf8f5;
+  --el-bg-color-overlay: #ffffff;
+
+  /* Text */
+  --el-text-color-primary: #2c2c2c;
+  --el-text-color-regular: #4a4a4a;
+  --el-text-color-secondary: #6b6b6b;
+  --el-text-color-placeholder: #b0b0b0;
+
+  /* Border */
+  --el-border-color: #e8e4db;
+  --el-border-color-light: #f0ede6;
+  --el-border-color-lighter: #f5f2ec;
+  --el-border-color-extra-light: #faf8f5;
+
+  /* Fill */
+  --el-fill-color: #f5f2ec;
+  --el-fill-color-light: #faf8f5;
+  --el-fill-color-lighter: #fcfbf9;
+
+  /* Border radius */
+  --el-border-radius-base: 6px;
+  --el-border-radius-small: 4px;
+  --el-border-radius-round: 20px;
+
+  /* Typography */
+  --el-font-family: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+
+  /* Box shadow */
+  --el-box-shadow-light: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --el-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --el-box-shadow-dark: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* Menu */
+  --el-menu-bg-color: #1a1f2e;
+  --el-menu-text-color: #a8b0c0;
+  --el-menu-hover-bg-color: rgba(184, 134, 11, 0.08);
+  --el-menu-active-color: #e8d5a3;
+  --el-menu-hover-text-color: #d1c8b0;
+}
+
+/* ── Global resets ── */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background: var(--surface-paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Subtle paper grain (CSS noise) ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.3;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1ccc0;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b8b0a0;
+}
+
+/* ── Element Plus component tweaks ── */
+
+/* Card */
+.el-card {
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-card) !important;
+  background: var(--surface-card) !important;
+}
+.el-card:hover {
+  box-shadow: var(--shadow-card-hover) !important;
+}
+
+/* Table */
+.el-table {
+  --el-table-border-color: var(--border-light);
+  --el-table-header-bg-color: #faf8f5;
+  --el-table-row-hover-bg-color: #fdfaf5;
+}
+.el-table th.el-table__cell {
+  background: #faf8f5 !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+.el-table .el-table__cell {
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+/* Tag */
+.el-tag {
+  border-radius: var(--radius-sm) !important;
+  font-weight: 500 !important;
+}
+
+/* Button */
+.el-button {
+  border-radius: var(--radius-sm) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em;
+}
+.el-button--primary {
+  --el-button-bg-color: var(--brand-gold);
+  --el-button-border-color: var(--brand-gold);
+  --el-button-hover-bg-color: var(--brand-gold-light);
+  --el-button-hover-border-color: var(--brand-gold-light);
+}
+
+/* Input */
+.el-input .el-input__wrapper {
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+}
+.el-input .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--brand-gold-light) inset !important;
+}
+
+/* Dialog */
+.el-dialog {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-elevated) !important;
+}
+.el-dialog__header {
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 20px 24px !important;
+}
+
+/* Drawer */
+.el-drawer__header {
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 20px 24px !important;
+  margin-bottom: 0 !important;
+}
+.el-drawer__body {
+  padding: 24px !important;
+}
+
+/* Pagination */
+.el-pagination {
+  --el-pagination-button-bg-color: var(--surface-card);
+}
+.el-pagination .el-pager li.is-active {
+  background: var(--brand-gold) !important;
+  color: #fff !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+/* Menu (sidebar) */
+.el-menu {
+  border-right: none !important;
+}
+.el-menu-item {
+  margin: 2px 8px !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease;
+}
+.el-menu-item.is-active {
+  background: rgba(184, 134, 11, 0.12) !important;
+  color: var(--text-sidebar-active) !important;
+  font-weight: 500;
+}
+
+/* Badge */
+.el-badge__content {
+  border: 2px solid var(--surface-paper) !important;
+}
+
+/* Message / Notification */
+.el-message {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-elevated) !important;
+}
+
+/* Link buttons */
+.el-button.is-link {
+  color: var(--brand-gold) !important;
+}
+.el-button.is-link:hover {
+  color: var(--brand-gold-light) !important;
+}
+
+/* Select / Dropdown */
+.el-select .el-input__wrapper {
+  border-radius: var(--radius-sm) !important;
+}
+.el-select-dropdown__item.is-selected {
+  color: var(--brand-gold) !important;
+  font-weight: 500 !important;
+}
+.el-popper {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-elevated) !important;
+}
+
+/* Descriptions (used in detail drawers) */
+.el-descriptions {
+  --el-descriptions-item-bordered-label-background: var(--fill-color-light);
+}
+.el-descriptions__label {
+  color: var(--text-secondary) !important;
+  font-weight: 450 !important;
+}
+.el-descriptions__content {
+  color: var(--text-primary) !important;
+}
+
+/* Timeline */
+.el-timeline-item__node {
+  border-radius: 50% !important;
+}
+.el-timeline-item__content {
+  color: var(--text-secondary) !important;
+}
+
+/* Page header (back navigation) */
+.el-page-header__title {
+  font-family: var(--font-display) !important;
+  font-weight: 500 !important;
+}
+
+/* Switch */
+.el-switch.is-checked .el-switch__core {
+  background: var(--brand-gold) !important;
+  border-color: var(--brand-gold) !important;
+}
+
+/* Loading */
+.el-loading-spinner .circular circle {
+  stroke: var(--brand-gold) !important;
+}
+
+/* Checkbox */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background: var(--brand-gold) !important;
+  border-color: var(--brand-gold) !important;
+}
+
+/* Date picker */
+.el-date-editor .el-input__wrapper {
+  border-radius: var(--radius-sm) !important;
+}
+.el-date-table td.current:not(.disabled) .el-date-table-cell__text {
+  background: var(--brand-gold) !important;
+  color: #fff !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+/* Popover */
+.el-popover {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-elevated) !important;
+}
+
+/* Card header within main content */
+.el-card__header {
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 16px 24px !important;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.el-card__body {
+  padding: 20px 24px !important;
+}
+
+/* Form labels */
+.el-form-item__label {
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  font-weight: 450 !important;
+}
+
+/* Divider */
+.el-divider__text {
+  background: var(--surface-paper) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+}
