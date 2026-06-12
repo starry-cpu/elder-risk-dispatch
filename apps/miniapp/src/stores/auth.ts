@@ -13,5 +13,30 @@ export const useAuthStore = defineStore('auth', () => {
   function setToken(t: string) { token.value = t; uni.setStorageSync('token', t); }
   function setUser(u: typeof user.value) { user.value = u; }
   function logout() { token.value = ''; user.value = null; uni.removeStorageSync('token'); }
-  return { token, user, loading, isAuthenticated, isWorker, isElder, setToken, setUser, logout };
+
+  async function login(code: string) {
+    loading.value = true;
+    try {
+      const { authApi } = await import('@/api/auth');
+      const res = await authApi.wechatLogin(code);
+      const data = (res as any)?.data?.data;
+      if (data?.token) setToken(data.token);
+      if (data?.user) setUser(data.user);
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function fetchUser() {
+    try {
+      const { authApi } = await import('@/api/auth');
+      const res = await authApi.getMe();
+      const data = (res as any)?.data?.data;
+      if (data) setUser(data);
+    } catch {
+      // silently fail if not authenticated
+    }
+  }
+
+  return { token, user, loading, isAuthenticated, isWorker, isElder, setToken, setUser, logout, login, fetchUser };
 });
