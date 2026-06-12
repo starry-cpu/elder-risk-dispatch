@@ -30,7 +30,12 @@ onMounted(() => {
   statusBarHeight.value = sysInfo.statusBarHeight || 20;
 });
 
+const emit = defineEmits<{
+  back: [];
+}>();
+
 function handleBack() {
+  emit('back');
   uni.navigateBack({ delta: 1 });
 }
 </script>

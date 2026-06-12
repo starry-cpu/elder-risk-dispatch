@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   accentColor?: string;
   clickable?: boolean;
 }>(), {
@@ -28,6 +28,7 @@ const emit = defineEmits<{
 }>();
 
 function handleClick() {
+  if (!props.clickable) return;
   emit('click');
 }
 </script>

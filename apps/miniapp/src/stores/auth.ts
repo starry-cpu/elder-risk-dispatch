@@ -9,7 +9,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isWorker = computed(() =>
     user.value?.role === 'GRID_WORKER' || user.value?.role === 'COMMUNITY_DOCTOR' ||
     user.value?.role === 'PROPERTY' || user.value?.role === 'VOLUNTEER');
-  const isElder = computed(() => user.value?.role === 'FAMILY');
+  const isElder = computed(() =>
+    user.value?.role === 'FAMILY' || user.value?.role === 'ELDER');
   function setToken(t: string) { token.value = t; uni.setStorageSync('token', t); }
   function setUser(u: typeof user.value) { user.value = u; }
   function logout() { token.value = ''; user.value = null; uni.removeStorageSync('token'); }
@@ -34,7 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
       const data = (res as any)?.data?.data;
       if (data) setUser(data);
     } catch {
-      // silently fail if not authenticated
+      logout(); // clear stale token so isAuthenticated becomes false
     }
   }
 
