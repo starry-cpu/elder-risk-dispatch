@@ -13,6 +13,8 @@ const config: Config = {
   transformIgnorePatterns: [
     'node_modules/(?!.*@aws-sdk)',
   ],
+  // Keep Jest cache inside the project so it gets cleaned with node_modules
+  cacheDirectory: '<rootDir>/../node_modules/.cache/jest',
   moduleNameMapper: {
     '^@src/(.*)$': '<rootDir>/$1',
     '^uuid$': '<rootDir>/__mocks__/uuid',

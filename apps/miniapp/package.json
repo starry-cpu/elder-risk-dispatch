@@ -3,9 +3,29 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "echo 'miniapp placeholder'",
-    "build": "echo 'miniapp build placeholder'",
-    "lint": "echo 'miniapp lint placeholder'",
-    "test": "echo 'miniapp test placeholder'"
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "lint": "eslint \"src/**/*.{ts,vue}\" --fix",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@care/shared-types": "workspace:*",
+    "luch-request": "^3.1.0",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.0",
+    "wot-design-uni": "^1.0.0"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.0",
+    "@dcloudio/uni-app": "3.0.0-alpha-5010320260611001",
+    "@dcloudio/uni-cli-shared": "3.0.0-alpha-5010320260611001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-5010320260611001",
+    "@dcloudio/vite-plugin-uni": "3.0.0-alpha-5010320260611001",
+    "@vue/test-utils": "^2.4.0",
+    "jsdom": "^25.0.0",
+    "sass": "^1.80.0",
+    "vitest": "^2.1.0",
+    "vue-tsc": "^2.2.0"
   }
 }
