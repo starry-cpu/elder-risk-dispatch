@@ -23,9 +23,12 @@ const loading = ref(false);
 async function enterApp() {
   loading.value = true;
   try {
-    // 确保已获取用户信息
+    // 确保已获取用户信息（8 秒超时，避免长时间等待）
     if (!auth.user) {
-      await auth.fetchUser();
+      await Promise.race([
+        auth.fetchUser(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ]);
     }
 
     if (auth.isWorker || auth.isAdmin) {
@@ -41,15 +44,18 @@ async function enterApp() {
       });
     }
   } catch {
-    // fetchUser 失败（如 token 过期），fall through 到微信登录
+    // fetchUser 失败（token 过期 / 网络超时 / 服务器不可达）
     if (auth.isAuthenticated) {
-      uni.showToast({ title: '网络异常，请重试', icon: 'none' });
+      uni.showToast({ title: '网络异常，请检查后端服务', icon: 'none' });
       return;
     }
     // token 无效或不存在，触发微信登录
     try {
       const { code } = await uniLogin();
-      await auth.login(code);
+      await Promise.race([
+        auth.login(code),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ]);
       if (auth.isWorker || auth.isAdmin) {
         uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
       } else if (auth.isElder) {
@@ -63,7 +69,8 @@ async function enterApp() {
         });
       }
     } catch (e: any) {
-      uni.showToast({ title: e?.message || '登录失败', icon: 'none' });
+      const msg = e?.message === 'timeout' ? '网络超时，请确认后端已启动' : (e?.message || '登录失败');
+      uni.showToast({ title: msg, icon: 'none' });
     }
   } finally {
     loading.value = false;
@@ -79,18 +86,9 @@ function uniLogin(): Promise<{ code: string }> {
   });
 }
 
-onMounted(async () => {
-  // 有 token 但无 user → 先拉取用户信息
-  if (auth.isAuthenticated && !auth.user) {
-    try {
-      await auth.fetchUser();
-    } catch {
-      // token 过期，清除后等待用户手动点击
-      auth.logout();
-      return;
-    }
-  }
-  // 已登录用户直接跳转
+onMounted(() => {
+  // 只在已有完整会话（token + user 均已缓存）时自动跳转
+  // 不做网络请求 — 避免接口不通时阻塞页面导致 timeout
   if (auth.isAuthenticated && auth.user) {
     if (auth.isWorker || auth.isAdmin) {
       uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
@@ -98,6 +96,7 @@ onMounted(async () => {
       uni.redirectTo({ url: '/pagesElder/check-in/index' });
     }
   }
+  // 否则展示首页，用户点击按钮后触发 enterApp()
 });
 </script>
 
