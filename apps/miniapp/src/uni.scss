@@ -1,4 +1,10 @@
-$elder-font-size-lg: 40rpx;
-$elder-font-size-md: 32rpx;
-$elder-touch-min-size: 88rpx;
-$worker-font-size: 28rpx;
+@import './styles/tokens.scss';
+
+// 页面全局背景
+page {
+  background-color: $color-canvas;
+  color: $color-text;
+  font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: $text-body;
+  line-height: $line-height-normal;
+}

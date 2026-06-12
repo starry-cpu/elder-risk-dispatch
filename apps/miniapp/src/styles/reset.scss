@@ -1,0 +1,76 @@
+@import './tokens.scss';
+
+// ========== wd-tabs 覆盖 ==========
+.wd-tabs {
+  background: $color-surface !important;
+}
+.wd-tabs__line {
+  background-color: $color-brand !important;
+  height: 4rpx !important;
+}
+.wd-tab {
+  font-size: $text-body !important;
+  color: $color-text-secondary !important;
+}
+.wd-tab--active {
+  color: $color-text !important;
+  font-weight: $font-weight-medium !important;
+}
+
+// ========== wd-timeline 覆盖 ==========
+.wd-timeline-item__content {
+  font-size: $text-body !important;
+}
+.wd-timeline-item__time {
+  font-size: $text-detail !important;
+  color: $color-text-tertiary !important;
+}
+
+// ========== wd-textarea 覆盖 ==========
+.wd-textarea {
+  background: transparent !important;
+  font-size: $text-body !important;
+}
+.wd-textarea__textarea {
+  color: $color-text !important;
+  caret-color: $color-brand !important;
+}
+.wd-textarea__placeholder {
+  color: $color-text-tertiary !important;
+}
+
+// ========== wd-input 覆盖 ==========
+.wd-input {
+  background: transparent !important;
+}
+.wd-input__inner {
+  font-size: $text-body !important;
+  color: $color-text !important;
+  caret-color: $color-brand !important;
+}
+.wd-input__placeholder {
+  color: $color-text-tertiary !important;
+}
+
+// ========== wd-picker 容器覆盖 ==========
+.wd-picker__toolbar {
+  background: $color-surface !important;
+}
+
+// ========== wd-message-box 覆盖 ==========
+.wd-message-box__body {
+  font-size: $text-body !important;
+  color: $color-text !important;
+}
+
+// ========== 全局按钮基础重置 ==========
+.wd-button--primary {
+  background-color: $color-brand !important;
+  border-color: $color-brand !important;
+}
+
+// ========== 移除默认圆角阴影 ==========
+.wd-cell,
+.wd-cell-group {
+  background: transparent !important;
+}
