@@ -28,12 +28,11 @@ async function enterApp() {
       await auth.fetchUser();
     }
 
-    if (auth.isWorker) {
+    if (auth.isWorker || auth.isAdmin) {
       uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
     } else if (auth.isElder) {
       uni.redirectTo({ url: '/pagesElder/check-in/index' });
     } else {
-      // 调试：显示实际角色信息
       const role = auth.user?.role || '无';
       uni.showToast({
         title: `未知角色(${role})，请联系管理员`,
@@ -44,7 +43,6 @@ async function enterApp() {
   } catch {
     // fetchUser 失败（如 token 过期），fall through 到微信登录
     if (auth.isAuthenticated) {
-      // token 有效但 fetchUser 网络错误，提示用户重试
       uni.showToast({ title: '网络异常，请重试', icon: 'none' });
       return;
     }
@@ -52,7 +50,7 @@ async function enterApp() {
     try {
       const { code } = await uniLogin();
       await auth.login(code);
-      if (auth.isWorker) {
+      if (auth.isWorker || auth.isAdmin) {
         uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
       } else if (auth.isElder) {
         uni.redirectTo({ url: '/pagesElder/check-in/index' });
@@ -94,7 +92,7 @@ onMounted(async () => {
   }
   // 已登录用户直接跳转
   if (auth.isAuthenticated && auth.user) {
-    if (auth.isWorker) {
+    if (auth.isWorker || auth.isAdmin) {
       uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
     } else if (auth.isElder) {
       uni.redirectTo({ url: '/pagesElder/check-in/index' });
