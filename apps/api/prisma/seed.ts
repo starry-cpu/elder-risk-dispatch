@@ -1,8 +1,55 @@
-import { PrismaClient, RiskLevel } from '@prisma/client';
+import { PrismaClient, RiskLevel, Role } from '@prisma/client';
+import * as crypto from 'crypto';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+/** Replicates FieldEncryptionService.encrypt() for standalone seed usage */
+function encryptField(plaintext: string): string {
+  const keyBase64 = process.env.FIELD_ENCRYPTION_KEY;
+  if (!keyBase64) {
+    throw new Error('FIELD_ENCRYPTION_KEY environment variable is required');
+  }
+  const key = Buffer.from(keyBase64, 'base64');
+  if (key.length !== 32) {
+    throw new Error(`FIELD_ENCRYPTION_KEY must be 32 bytes, got ${key.length}`);
+  }
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+}
+
+function hashPhone(phone: string): string {
+  return crypto.createHash('sha256').update(phone).digest('hex');
+}
+
 async function main() {
+  console.log('Seeding default users...');
+
+  const defaultAdminPhone = '13800138000';
+  const encryptedPhone = encryptField(defaultAdminPhone);
+  const phoneHash = hashPhone(defaultAdminPhone);
+
+  const existingAdmin = await prisma.user.findUnique({ where: { phoneHash } });
+  if (!existingAdmin) {
+    await prisma.user.create({
+      data: {
+        phone: encryptedPhone,
+        phoneHash,
+        name: '系统管理员',
+        role: Role.ADMIN,
+        passwordHash: await bcrypt.hash('admin123', 10),
+        district: '东区',
+        skills: ['系统管理'],
+      },
+    });
+    console.log(`  Created admin user: ${defaultAdminPhone} / admin123`);
+  } else {
+    console.log(`  Admin user already exists: ${defaultAdminPhone}`);
+  }
+
   console.log('Seeding risk rules...');
 
   const rules = [

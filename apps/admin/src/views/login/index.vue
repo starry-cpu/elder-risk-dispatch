@@ -86,7 +86,7 @@ async function handleLogin() {
   loading.value = true;
   try {
     const res = await authApi.adminLogin(form);
-    const token = res.data.data.accessToken;
+    const token = res.data.data.token;
     authStore.setToken(token);
 
     const meRes = await authApi.getMe();
