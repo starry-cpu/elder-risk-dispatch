@@ -1,33 +1,223 @@
 <template>
   <view class="page">
-    <view class="filter-bar flex gap-2 p-3">
-      <wd-picker :columns="[{ values: ['', 'PENDING_REVIEW', 'CONFIRMED', 'IGNORED'] }]" @confirm="(e: { value: string[] }) => { statusFilter = e.value[0]; loadData() }">
-        <wd-button size="small">状态筛选</wd-button>
-      </wd-picker>
+    <AppNavbar title="风险待办" />
+
+    <!-- 筛选栏 -->
+    <view class="filter-bar" @click="showPicker = true">
+      <text class="filter-bar__label">{{ statusLabel }}</text>
+      <text class="filter-bar__arrow">▾</text>
     </view>
-    <view v-if="sortedItems.length === 0" class="empty text-center py-10 text-gray-400">暂无待处理预警</view>
-    <view v-for="item in sortedItems" :key="item.id" class="risk-card m-3 p-4 bg-white rounded-lg shadow-sm" @click="goToReview(item)">
-      <view class="flex-between mb-2">
-        <view class="flex items-center gap-2">
-          <wd-tag :type="item.level === 'HIGH' ? 'danger' : 'warning'" size="small">{{ item.level === 'HIGH' ? '高风险' : item.level === 'MEDIUM' ? '中风险' : '低风险' }}</wd-tag>
-          <text class="font-bold">{{ item.elderName }}</text>
+
+    <!-- 加载态 -->
+    <view v-if="loading" class="page-state">
+      <text class="page-state__text">加载中...</text>
+    </view>
+
+    <!-- 空状态 -->
+    <AppEmpty
+      v-else-if="sortedItems.length === 0"
+      message="暂无待处理风险"
+      hint="所有风险事件已处理完毕"
+    />
+
+    <!-- 列表 -->
+    <view v-else>
+      <AppCard
+        v-for="item in sortedItems"
+        :key="item.id"
+        :accent-color="accentColor(item.level)"
+        clickable
+        @click="goToReview(item)"
+      >
+        <view class="risk-row">
+          <view class="risk-row__main">
+            <view class="risk-row__top">
+              <AppStatusDot :status="item.level.toLowerCase()" :size="12" />
+              <AppTag :level="item.level.toLowerCase() as any" />
+              <text class="risk-row__reason">{{ item.reason }}</text>
+            </view>
+            <text class="risk-row__elder">{{ item.elderName }}</text>
+          </view>
+          <view class="risk-row__side">
+            <text class="risk-row__time">{{ formatTime(item.createdAt) }}</text>
+            <AppButton type="secondary" size="compact" @click.stop="goToReview(item)">
+              去处理
+            </AppButton>
+          </view>
         </view>
-        <text class="text-gray-400 text-sm">{{ item.createdAt }}</text>
+      </AppCard>
+
+      <view class="page-end">
+        <text class="page-end__text">已加载全部</text>
       </view>
-      <text class="text-sm text-gray-600">{{ item.reason }}</text>
-      <view class="flex-between mt-2"><text class="text-xs text-gray-400">来源: {{ item.source }} | 分数: {{ item.score }}</text><wd-icon name="arrow-right" size="16" /></view>
     </view>
+
+    <!-- 筛选 Picker -->
+    <wd-picker
+      :columns="[statusColumns]"
+      :model-value="[statusFilter]"
+      @confirm="onPickerConfirm"
+    />
   </view>
 </template>
+
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import AppNavbar from '@/components/AppNavbar.vue';
+import AppCard from '@/components/AppCard.vue';
+import AppStatusDot from '@/components/AppStatusDot.vue';
+import AppTag from '@/components/AppTag.vue';
+import AppButton from '@/components/AppButton.vue';
+import AppEmpty from '@/components/AppEmpty.vue';
+import { riskApi } from '@/api/risk';
 import { useRiskTaskList } from '@/composables/useRiskTaskList';
 import type { RiskTaskItem } from '@/composables/useRiskTaskList';
+
 const { sortItems, filterByStatus } = useRiskTaskList();
+
 const items = ref<RiskTaskItem[]>([]);
-const statusFilter = ref('PENDING_REVIEW');
-const sortedItems = computed(() => { const filtered = filterByStatus(items.value, statusFilter.value); return sortItems(filtered); });
-function loadData() { uni.showLoading({ title: '加载中...' }); uni.request({ url: '/api/v1/risk/events', method: 'GET', data: { status: statusFilter.value || undefined }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: (res: any) => { if (res.data?.code === 0) items.value = res.data.data.items; }, complete: () => uni.hideLoading() }); }
-function goToReview(item: RiskTaskItem) { uni.navigateTo({ url: `/pagesWorker/risk-tasks/review?id=${item.id}` }); }
-onMounted(() => { loadData(); });
+const statusFilter = ref('');
+const loading = ref(false);
+const showPicker = ref(false);
+
+const statusColumns = [
+  { value: '', label: '全部' },
+  { value: 'PENDING_REVIEW', label: '待复核' },
+  { value: 'CONFIRMED', label: '已确认' },
+  { value: 'IGNORED', label: '已忽略' },
+];
+
+const statusLabel = computed(() => {
+  const found = statusColumns.find(c => c.value === statusFilter.value);
+  return found ? found.label : '全部';
+});
+
+const sortedItems = computed(() => {
+  const filtered = filterByStatus(items.value, statusFilter.value);
+  return sortItems(filtered);
+});
+
+function accentColor(level: string): string {
+  if (level === 'HIGH') return '#C4856B';
+  if (level === 'MEDIUM') return '#C49B5E';
+  return '#6E8A9A';
+}
+
+function formatTime(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hour = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${month}-${day} ${hour}:${min}`;
+}
+
+function onPickerConfirm(e: { value: string[] }) {
+  statusFilter.value = e.value[0];
+  showPicker.value = false;
+  loadData();
+}
+
+async function loadData() {
+  loading.value = true;
+  try {
+    const res = await riskApi.listEvents({ status: statusFilter.value || undefined });
+    const data = (res as any)?.data?.data;
+    if (data?.items) items.value = data.items;
+  } catch {
+    uni.showToast({ title: '加载失败，下拉重试', icon: 'none' });
+  } finally {
+    loading.value = false;
+  }
+}
+
+function goToReview(item: RiskTaskItem) {
+  uni.navigateTo({ url: `/pagesWorker/risk-tasks/review?id=${item.id}` });
+}
+
+onMounted(() => {
+  loadData();
+});
 </script>
+
+<style scoped>
+.page {
+  min-height: 100vh;
+  background-color: #F7F3ED;
+  padding-bottom: 48rpx;
+}
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 16rpx 20rpx;
+}
+.filter-bar__label {
+  font-size: 28rpx;
+  color: #2C2B29;
+  font-weight: 500;
+}
+.filter-bar__arrow {
+  font-size: 22rpx;
+  color: #6B6760;
+}
+.risk-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+.risk-row__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  min-width: 0;
+}
+.risk-row__top {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.risk-row__reason {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #2C2B29;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.risk-row__elder {
+  font-size: 24rpx;
+  color: #6B6760;
+}
+.risk-row__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+.risk-row__time {
+  font-size: 22rpx;
+  color: #9E9990;
+}
+.page-state {
+  display: flex;
+  justify-content: center;
+  padding: 80rpx 0;
+}
+.page-state__text {
+  font-size: 28rpx;
+  color: #9E9990;
+}
+.page-end {
+  display: flex;
+  justify-content: center;
+  padding: 24rpx 0;
+}
+.page-end__text {
+  font-size: 22rpx;
+  color: #9E9990;
+}
+</style>
