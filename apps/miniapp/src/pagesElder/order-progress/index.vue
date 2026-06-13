@@ -54,7 +54,9 @@ import { workOrdersApi } from '@/api/work-orders';
 import { useOrderProgress } from '@/composables/useOrderProgress';
 import type { OrderSummary } from '@/composables/useOrderProgress';
 import { formatTime } from '@/utils/format';
+import { useAuthStore } from '@/stores/auth';
 
+const auth = useAuthStore();
 const { formatOrdersList } = useOrderProgress();
 const orders = ref<OrderSummary[]>([]);
 const loading = ref(false);
@@ -86,7 +88,7 @@ function levelToTag(level: string): 'high' | 'medium' | 'low' {
 async function loadData() {
   loading.value = true;
   try {
-    const res = await workOrdersApi.list({});
+    const res = await workOrdersApi.list({ elderId: auth.currentElderId });
     const data = (res as any)?.data?.data;
     if (data?.items) orders.value = data.items;
   } catch {

@@ -1,6 +1,6 @@
 import http, { wrap } from './client';
 export const workOrdersApi = {
-  list: (params: { status?: string; page?: number; limit?: number }) =>
+  list: (params: { status?: string; type?: string; elderId?: string; page?: number; limit?: number }) =>
     wrap(http.get('/work-orders', { params })),
   getById: (id: string) => wrap(http.get(`/work-orders/${id}`)),
   assign: (id: string, data: { assigneeId: string }) =>
