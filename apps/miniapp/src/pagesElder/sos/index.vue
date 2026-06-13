@@ -16,7 +16,11 @@
         <text v-if="isRecording" class="sos-btn__time">{{ duration }}s / {{ maxDuration }}s</text>
       </view>
 
-      <view v-if="voiceUrl" class="sos-sent">
+      <view v-if="uploading" class="sos-sent sos-sent--info">
+        <text class="sos-sent__title sos-sent__title--info">发送中...</text>
+        <text class="sos-sent__hint">正在上传语音求助</text>
+      </view>
+      <view v-else-if="sent" class="sos-sent">
         <text class="sos-sent__title">求助已发送!</text>
         <text class="sos-sent__hint">工作人员将尽快响应</text>
       </view>
@@ -25,13 +29,21 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import AppNavbar from '@/components/AppNavbar.vue';
 import { useSosVoice } from '@/composables/useSosVoice';
 import { checkInsApi } from '@/api/check-ins';
+import { uploadApi } from '@/api/upload';
+import { useAuthStore } from '@/stores/auth';
 
-const { isRecording, duration, voiceUrl, maxDuration, startRecording, stopRecording, setVoiceUrl } = useSosVoice();
+const auth = useAuthStore();
+const { isRecording, duration, maxDuration, recordedFilePath, startRecording, stopRecording } = useSosVoice();
+const uploading = ref(false);
+const sent = ref(false);
 
 function handleTouchStart() {
+  // 重新录音时清除上一次的"已发送"状态
+  sent.value = false;
   startRecording();
 }
 
@@ -41,22 +53,30 @@ function handleTouchEnd() {
     uni.showToast({ title: '录音时间太短', icon: 'none' });
     return;
   }
-  // TODO: Replace with real voice recording via uni.getRecorderManager() to capture audio,
-  // then wx.uploadFile() to upload to the server and get back a real voiceUrl.
-  // Currently uses a placeholder URL — backend will receive unusable data.
-  const tempUrl = 'recorded_audio_' + Date.now();
-  setVoiceUrl(tempUrl);
-  const elderId = uni.getStorageSync('elderId') || '';
-  checkInsApi.create({
-    elderId,
-    method: 'VOICE',
-    content: '语音求助',
-    voiceUrl: tempUrl,
-  }).then(() => {
-    uni.showToast({ title: '求助已发出' });
-  }).catch(() => {
-    // client interceptor already shows toast
-  });
+  uploading.value = true;
+  setTimeout(async () => {
+    const filePath = recordedFilePath.value;
+    if (!filePath) {
+      uni.showToast({ title: '录音失败，请重试', icon: 'none' });
+      uploading.value = false;
+      return;
+    }
+    try {
+      const { url } = await uploadApi.uploadAudio(filePath);
+      await checkInsApi.create({
+        elderId: auth.currentElderId,
+        method: 'VOICE',
+        content: '语音求助',
+        voiceUrl: url,
+      });
+      sent.value = true;
+      uni.showToast({ title: '求助已发出' });
+    } catch {
+      uni.showToast({ title: '求助发送失败，请重试', icon: 'none' });
+    } finally {
+      uploading.value = false;
+    }
+  }, 200);
 }
 </script>
 
@@ -122,6 +142,9 @@ function handleTouchEnd() {
   font-size: 32rpx;
   font-weight: 600;
   color: #7A9A6E;
+}
+.sos-sent__title--info {
+  color: #6B6760;
 }
 .sos-sent__hint {
   font-size: 24rpx;
