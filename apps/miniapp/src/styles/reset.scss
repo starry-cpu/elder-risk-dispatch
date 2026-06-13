@@ -17,13 +17,12 @@
   font-weight: $font-weight-medium !important;
 }
 
-// ========== wd-timeline 覆盖 ==========
-.wd-timeline-item__content {
+// ========== wd-steps 覆盖（原 wd-timeline 不存在，wot 实际为 wd-steps/wd-step） ==========
+.wd-step__description {
   font-size: $text-body !important;
 }
-.wd-timeline-item__time {
-  font-size: $text-detail !important;
-  color: $color-text-tertiary !important;
+.wd-step__title {
+  font-size: $text-body !important;
 }
 
 // ========== wd-textarea 覆盖 ==========

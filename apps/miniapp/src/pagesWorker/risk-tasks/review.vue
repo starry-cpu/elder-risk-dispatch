@@ -73,21 +73,12 @@ import AppNavbar from '@/components/AppNavbar.vue';
 import AppTag from '@/components/AppTag.vue';
 import AppButton from '@/components/AppButton.vue';
 import { riskApi } from '@/api/risk';
+import { formatTime } from '@/utils/format';
 
 const event = ref<any>(null);
 const note = ref('');
 const loading = ref(false);
 const submitting = ref(false);
-
-function formatTime(dateStr: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hour = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hour}:${min}`;
-}
 
 async function loadDetail() {
   const pages = getCurrentPages();

@@ -70,6 +70,7 @@ import AppButton from '@/components/AppButton.vue';
 import AppEmpty from '@/components/AppEmpty.vue';
 import { workOrdersApi } from '@/api/work-orders';
 import { TYPE_LABELS } from '@/composables/useOrderProgress';
+import { formatTime } from '@/utils/format';
 
 const activeTab = ref('ASSIGNED');
 const orders = ref<any[]>([]);
@@ -97,16 +98,6 @@ function statusDotType(status: string): string {
   if (status === 'ASSIGNED') return 'warning';
   if (status === 'IN_PROGRESS') return 'info';
   return 'success';
-}
-
-function formatTime(dateStr: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hour = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hour}:${min}`;
 }
 
 async function loadData() {

@@ -1,28 +1,62 @@
 <template>
-  <view class="page flex flex-col items-center justify-center min-h-screen px-6 space-y-8">
-    <text class="text-xl font-bold">一键报平安</text>
-    <view class="w-full space-y-4">
-      <view class="checkin-btn bg-green-500 text-white rounded-2xl py-8 flex-center text-center active:opacity-80" @click="submitCheckIn('ONE_TAP')">
-        <view><text class="text-4xl">🏠</text><view class="text-xl font-bold mt-2">我很好</view><view class="text-sm opacity-80">点此一键报平安</view></view>
+  <view class="page">
+    <AppNavbar title="一键报平安" />
+
+    <view class="checkin">
+      <!-- 一键报平安 -->
+      <view class="checkin-card checkin-card--primary" @click="submitCheckIn('ONE_TAP')">
+        <text class="checkin-card__icon">🏠</text>
+        <text class="checkin-card__title">我很好</text>
+        <text class="checkin-card__hint">点此一键报平安</text>
       </view>
-      <view class="checkin-btn bg-blue-500 text-white rounded-2xl py-6 flex-center text-center active:opacity-80" @touchstart="startVoice" @touchend="stopVoice">
-        <view><text class="text-3xl">{{ isRecording ? '🔴' : '🎤' }}</text><view class="text-lg font-bold mt-1">{{ isRecording ? '松开发送' : '长按语音报平安' }}</view><view v-if="isRecording" class="text-sm mt-1">{{ duration }}s</view></view>
+
+      <!-- 长按语音报平安 -->
+      <view
+        class="checkin-card checkin-card--info"
+        :class="{ 'checkin-card--recording': isRecording }"
+        @touchstart="startVoice"
+        @touchend="stopVoice"
+      >
+        <text class="checkin-card__icon">{{ isRecording ? '🔴' : '🎤' }}</text>
+        <text class="checkin-card__title">{{ isRecording ? '松开发送' : '长按语音报平安' }}</text>
+        <text v-if="isRecording" class="checkin-card__hint">{{ duration }}s</text>
+        <text v-else class="checkin-card__hint">按住说话</text>
       </view>
-      <view class="bg-white rounded-lg p-3 shadow-sm"><wd-textarea v-model="textContent" :rows="3" placeholder="或在这里输入报平安信息..." /><wd-button size="small" type="info" block class="mt-2" @click="submitCheckIn('TEXT')">文字提交</wd-button></view>
+
+      <!-- 文字报平安 -->
+      <view class="checkin-text">
+        <view class="checkin-text__field">
+          <textarea
+            v-model="textContent"
+            class="checkin-text__textarea"
+            placeholder="或在这里输入报平安信息..."
+            :maxlength="500"
+            auto-height
+          />
+        </view>
+        <AppButton type="primary" size="full" :loading="submitting" @click="submitCheckIn('TEXT')">
+          文字提交
+        </AppButton>
+      </view>
     </view>
   </view>
 </template>
+
 <script setup lang="ts">
 import { ref } from 'vue';
+import AppNavbar from '@/components/AppNavbar.vue';
+import AppButton from '@/components/AppButton.vue';
 import { useCheckIn } from '@/composables/useCheckIn';
 import { useSosVoice } from '@/composables/useSosVoice';
+import { checkInsApi } from '@/api/check-ins';
 
 const { validate } = useCheckIn();
 const { isRecording, duration, startRecording, stopRecording } = useSosVoice();
 const textContent = ref('');
 const elderId = ref(uni.getStorageSync('elderId') || '');
+const submitting = ref(false);
 
-function submitCheckIn(method: string) {
+async function submitCheckIn(method: string) {
   const result = validate({
     elderId: elderId.value,
     method,
@@ -33,21 +67,24 @@ function submitCheckIn(method: string) {
     uni.showToast({ title: result.message || '请完善信息', icon: 'none' });
     return;
   }
-  uni.request({
-    url: '/api/v1/check-ins',
-    method: 'POST',
-    data: { elderId: elderId.value, method, content: method === 'TEXT' ? textContent.value : undefined },
-    header: { Authorization: `Bearer ${uni.getStorageSync('token')}` },
-    success: () => {
-      uni.showToast({ title: '已报平安 ✅' });
-      textContent.value = '';
-    },
-  });
+  submitting.value = true;
+  try {
+    await checkInsApi.create({
+      elderId: elderId.value,
+      method,
+      content: method === 'TEXT' ? textContent.value : undefined,
+    });
+    uni.showToast({ title: '已报平安 ✅' });
+    textContent.value = '';
+  } catch {
+    // client interceptor already shows toast
+  } finally {
+    submitting.value = false;
+  }
 }
 
 function startVoice() {
   startRecording();
-  uni.showToast({ title: '开始录音', icon: 'none', duration: 500 });
 }
 
 function stopVoice() {
@@ -58,15 +95,85 @@ function stopVoice() {
   }
   // Submit VOICE check-in with placeholder voiceUrl (see TODO in sos/index.vue)
   const tempUrl = 'recorded_audio_' + Date.now();
-  uni.request({
-    url: '/api/v1/check-ins',
-    method: 'POST',
-    data: { elderId: elderId.value, method: 'VOICE', content: '语音报平安', voiceUrl: tempUrl },
-    header: { Authorization: `Bearer ${uni.getStorageSync('token')}` },
-    success: () => {
-      uni.showToast({ title: '已报平安 ✅' });
-    },
+  checkInsApi.create({
+    elderId: elderId.value,
+    method: 'VOICE',
+    content: '语音报平安',
+    voiceUrl: tempUrl,
+  }).then(() => {
+    uni.showToast({ title: '已报平安 ✅' });
+  }).catch(() => {
+    // client interceptor already shows toast
   });
 }
 </script>
-<style scoped>.checkin-btn { min-height: 120rpx; transition: opacity 0.15s; }</style>
+
+<style scoped>
+.page {
+  min-height: 100vh;
+  background-color: #F7F3ED;
+  padding-bottom: 48rpx;
+}
+.checkin {
+  padding: 32rpx 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+.checkin-card {
+  background-color: #FEFDFB;
+  border-radius: 12rpx;
+  padding: 48rpx 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  box-shadow: 0 1rpx 0 #E8E3DA;
+  transition: filter 0.15s;
+}
+.checkin-card:active {
+  filter: brightness(0.96);
+}
+.checkin-card--primary {
+  background-color: #7A9A6E;
+}
+.checkin-card--info {
+  background-color: #6E8A9A;
+}
+.checkin-card--recording {
+  filter: brightness(0.92);
+}
+.checkin-card__icon {
+  font-size: 64rpx;
+}
+.checkin-card__title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #FEFDFB;
+}
+.checkin-card__hint {
+  font-size: 24rpx;
+  color: #FEFDFB;
+  opacity: 0.85;
+}
+.checkin-text {
+  background-color: #FEFDFB;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  box-shadow: 0 1rpx 0 #E8E3DA;
+}
+.checkin-text__field {
+  border-bottom: 1rpx solid #E8E3DA;
+  padding-bottom: 12rpx;
+}
+.checkin-text__textarea {
+  width: 100%;
+  min-height: 120rpx;
+  font-size: 28rpx;
+  color: #2C2B29;
+  line-height: 1.6;
+}
+</style>

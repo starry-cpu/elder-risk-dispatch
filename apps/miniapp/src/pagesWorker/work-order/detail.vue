@@ -48,17 +48,16 @@
         <text class="detail-divider__text">处理记录</text>
       </view>
 
-      <!-- 时间线 -->
+      <!-- 时间线（wot-design-uni 提供 wd-steps/wd-step，无 wd-timeline） -->
       <view v-if="timeline.length > 0" class="detail-timeline">
-        <wd-timeline>
-          <wd-timeline-item
+        <wd-steps :active="timeline.length" vertical dot>
+          <wd-step
             v-for="t in timeline"
             :key="t.id"
             :title="t.action"
-            :content="t.note || ''"
-            :time="formatTime(t.createdAt)"
+            :description="(t.note ? t.note + '　' : '') + formatTime(t.createdAt)"
           />
-        </wd-timeline>
+        </wd-steps>
       </view>
 
       <!-- 操作按钮区（固定底部） -->
@@ -110,6 +109,7 @@ import AppButton from '@/components/AppButton.vue';
 import { workOrdersApi } from '@/api/work-orders';
 import { useWorkOrderFlow } from '@/composables/useWorkOrderFlow';
 import { TYPE_LABELS, STATUS_LABELS } from '@/composables/useOrderProgress';
+import { formatTime } from '@/utils/format';
 
 const { getAvailableActions, validateCompletion } = useWorkOrderFlow();
 
@@ -132,16 +132,6 @@ function statusDotType(status: string): string {
   if (status === 'IN_PROGRESS') return 'info';
   if (status === 'COMPLETED') return 'success';
   return 'info';
-}
-
-function formatTime(dateStr: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hour = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  return `${month}-${day} ${hour}:${min}`;
 }
 
 async function loadDetail() {
