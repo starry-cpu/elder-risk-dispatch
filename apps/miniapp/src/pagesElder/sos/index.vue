@@ -2,6 +2,27 @@
   <view class="page">
     <AppNavbar title="语音求助" />
 
+    <!-- 老人切换条（多老人可切换，单老人仅显示名字以便确认） -->
+    <view
+      v-if="auth.elders.length > 1"
+      class="elder-switch"
+      @click="showElderPicker = true"
+    >
+      <text class="elder-switch__name">{{ auth.currentElder?.name || '未选择' }}</text>
+      <text class="elder-switch__arrow">切换 ▾</text>
+    </view>
+    <view v-else-if="auth.currentElder" class="elder-switch elder-switch--single">
+      <text class="elder-switch__name">为 {{ auth.currentElder.name }} 求助</text>
+    </view>
+
+    <wd-action-sheet
+      :model-value="showElderPicker"
+      :actions="elderActions"
+      title="选择老人"
+      @select="onElderSelect"
+      @close="showElderPicker = false"
+    />
+
     <view class="sos">
       <text class="sos__hint">长按按钮录音，松开发送求助</text>
 
@@ -29,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import AppNavbar from '@/components/AppNavbar.vue';
 import { useSosVoice } from '@/composables/useSosVoice';
 import { checkInsApi } from '@/api/check-ins';
@@ -40,6 +61,18 @@ const auth = useAuthStore();
 const { isRecording, duration, maxDuration, recordedFilePath, startRecording, stopRecording } = useSosVoice();
 const uploading = ref(false);
 const sent = ref(false);
+const showElderPicker = ref(false);
+const elderActions = computed(() =>
+  auth.elders.map((e) => ({
+    name: e.name,
+    color: e.id === auth.currentElderId ? '#7A8B6E' : '#2C2B29',
+  })),
+);
+function onElderSelect({ item }: { item: { name: string } }) {
+  const found = auth.elders.find((e) => e.name === item.name);
+  if (found) auth.setCurrentElder(found.id);
+  showElderPicker.value = false;
+}
 
 function handleTouchStart() {
   // 重新录音时清除上一次的"已发送"状态
@@ -86,6 +119,19 @@ function handleTouchEnd() {
   background-color: #F7F3ED;
   padding-bottom: 48rpx;
 }
+.elder-switch {
+  margin: 16rpx 20rpx 0;
+  background-color: #FEFDFB;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1rpx 0 #E8E3DA;
+}
+.elder-switch--single { justify-content: center; }
+.elder-switch__name { font-size: 28rpx; font-weight: 500; color: #2C2B29; }
+.elder-switch__arrow { font-size: 24rpx; color: #6B6760; }
 .sos {
   display: flex;
   flex-direction: column;

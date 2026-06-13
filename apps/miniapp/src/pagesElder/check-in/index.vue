@@ -2,6 +2,27 @@
   <view class="page">
     <AppNavbar title="一键报平安" />
 
+    <!-- 老人切换条（仅多老人时可点击） -->
+    <view
+      v-if="auth.elders.length > 1"
+      class="elder-switch"
+      @click="showElderPicker = true"
+    >
+      <text class="elder-switch__name">{{ auth.currentElder?.name || '未选择' }}</text>
+      <text class="elder-switch__arrow">切换 ▾</text>
+    </view>
+    <view v-else-if="auth.currentElder" class="elder-switch elder-switch--single">
+      <text class="elder-switch__name">{{ auth.currentElder.name }}</text>
+    </view>
+
+    <wd-action-sheet
+      :model-value="showElderPicker"
+      :actions="elderActions"
+      title="选择老人"
+      @select="onElderSelect"
+      @close="showElderPicker = false"
+    />
+
     <view class="checkin">
       <!-- 一键报平安 -->
       <view class="checkin-card checkin-card--primary" @click="submitCheckIn('ONE_TAP')">
@@ -44,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import AppNavbar from '@/components/AppNavbar.vue';
 import AppButton from '@/components/AppButton.vue';
 import { useCheckIn } from '@/composables/useCheckIn';
@@ -59,6 +80,18 @@ const { isRecording, duration, recordedFilePath, startRecording, stopRecording }
 const textContent = ref('');
 const submitting = ref(false);
 const uploading = ref(false);
+const showElderPicker = ref(false);
+const elderActions = computed(() =>
+  auth.elders.map((e) => ({
+    name: e.name,
+    color: e.id === auth.currentElderId ? '#7A8B6E' : '#2C2B29',
+  })),
+);
+function onElderSelect({ item }: { item: { name: string } }) {
+  const found = auth.elders.find((e) => e.name === item.name);
+  if (found) auth.setCurrentElder(found.id);
+  showElderPicker.value = false;
+}
 
 async function submitCheckIn(method: string) {
   const result = validate({
@@ -130,6 +163,19 @@ function stopVoice() {
   background-color: #F7F3ED;
   padding-bottom: 48rpx;
 }
+.elder-switch {
+  margin: 16rpx 20rpx 0;
+  background-color: #FEFDFB;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1rpx 0 #E8E3DA;
+}
+.elder-switch--single { justify-content: center; }
+.elder-switch__name { font-size: 28rpx; font-weight: 500; color: #2C2B29; }
+.elder-switch__arrow { font-size: 24rpx; color: #6B6760; }
 .checkin {
   padding: 32rpx 20rpx;
   display: flex;
