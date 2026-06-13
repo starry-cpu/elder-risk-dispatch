@@ -1,4 +1,13 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  BadRequestException,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UploadsService } from './uploads.service';
 import { PresignedUrlDto } from './dto/presigned-url.dto';
@@ -17,5 +26,13 @@ export class UploadsController {
       dto.contentType,
       dto.folder,
     );
+  }
+
+  @Post('audio')
+  @ApiOperation({ summary: '上传语音文件（小程序 multipart 代理）' })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } })) // 10MB 上限
+  async uploadAudio(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('未收到文件');
+    return this.uploadsService.saveAudioFile(file.buffer, file.mimetype, file.originalname);
   }
 }
