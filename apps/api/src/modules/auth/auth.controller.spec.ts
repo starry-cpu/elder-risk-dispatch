@@ -9,6 +9,7 @@ describe('AuthController', () => {
 
   const mockAuthService = {
     wechatLogin: jest.fn(),
+    wechatLoginWithCode: jest.fn(),
     adminLogin: jest.fn(),
     validateUser: jest.fn(),
   };
@@ -25,11 +26,13 @@ describe('AuthController', () => {
 
   describe('POST /auth/wechat-login', () => {
     it('should return token and user', async () => {
-      mockAuthService.wechatLogin.mockResolvedValue({
+      mockAuthService.wechatLoginWithCode.mockResolvedValue({
         token: 'jwt-token',
         user: { id: '1', name: 'Test', role: Role.FAMILY },
       });
       const result = await controller.wechatLogin({ code: 'test-code' });
+      // 控制器应委托给 wechatLoginWithCode（用 code 换 openid 再签发）
+      expect(mockAuthService.wechatLoginWithCode).toHaveBeenCalledWith('test-code', undefined);
       expect(result).toHaveProperty('token');
     });
   });

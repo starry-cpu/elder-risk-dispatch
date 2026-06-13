@@ -1,10 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { FieldEncryptionService } from '../../common/crypto/field-encryption.service';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+
+// Mock global fetch（复刻 wechat.channel.spec.ts 的写法）
+const mockFetch = jest.fn();
+(global as any).fetch = mockFetch;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -184,6 +189,76 @@ describe('AuthService', () => {
     it('should throw when user not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       await expect(service.validateUser('non-existent')).rejects.toThrow();
+    });
+  });
+
+  describe('wechatLoginWithCode', () => {
+    beforeEach(() => {
+      mockFetch.mockReset();
+    });
+
+    afterEach(() => {
+      delete process.env.WECHAT_APPID;
+      delete process.env.WECHAT_SECRET;
+    });
+
+    it('should exchange code for openid and return token + user', async () => {
+      process.env.WECHAT_APPID = 'wx-test-appid';
+      process.env.WECHAT_SECRET = 'test-secret';
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ openid: 'openid-from-wechat' }),
+      });
+      mockPrisma.user.upsert.mockResolvedValue({
+        id: 'user-5',
+        openid: 'openid-from-wechat',
+        name: '微信用户',
+        role: Role.FAMILY,
+        district: null,
+        phone: null,
+        skills: [],
+        dutyStatus: 'OFF_DUTY',
+        createdAt: new Date(),
+      });
+
+      const result = await service.wechatLoginWithCode('wx-login-code', undefined);
+
+      // 应调用 jscode2session 且带上 code
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('js_code=wx-login-code'),
+      );
+      // upsert 用换来的 openid，而非原始 code
+      expect(mockPrisma.user.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { openid: 'openid-from-wechat' } }),
+      );
+      expect(result).toHaveProperty('token');
+      expect(result.user.role).toBe(Role.FAMILY);
+      expect(result.user).not.toHaveProperty('openid');
+    });
+
+    it('should throw UnauthorizedException when WECHAT_APPID/SECRET not configured', async () => {
+      // 不设置凭据（afterEach 也会清理）
+      await expect(service.wechatLoginWithCode('any-code')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      // 凭据缺失时不应发起外部请求
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should throw with WeChat errmsg when jscode2session returns errcode', async () => {
+      process.env.WECHAT_APPID = 'wx-test-appid';
+      process.env.WECHAT_SECRET = 'test-secret';
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ errcode: 40029, errmsg: 'invalid code' }),
+      });
+
+      await expect(service.wechatLoginWithCode('bad-code')).rejects.toThrow(
+        /invalid code/,
+      );
     });
   });
 });

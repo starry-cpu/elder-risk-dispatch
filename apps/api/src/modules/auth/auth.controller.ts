@@ -17,7 +17,8 @@ export class AuthController {
   @Post('wechat-login')
   @ApiOperation({ summary: '微信小程序登录' })
   wechatLogin(@Body() dto: WechatLoginDto) {
-    return this.authService.wechatLogin(dto.code, dto.nickname);
+    // 先用 code 换 openid，再 upsert + 签发 token（见 AuthService.wechatLoginWithCode）
+    return this.authService.wechatLoginWithCode(dto.code, dto.nickname);
   }
 
   @Public()
