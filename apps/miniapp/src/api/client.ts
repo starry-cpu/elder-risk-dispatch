@@ -5,12 +5,14 @@ import Request from 'luch-request';
  *
  * ⚠️ 微信小程序必须用绝对地址（无"当前域名"概念）。
  *
- * 默认本机开发用 localhost；真机预览时请在小程序里手动写入你电脑的局域网 IP：
- *   uni.setStorageSync('apiBase', 'http://192.168.1.100:3000/api/v1')
+ * 默认用本机局域网 IP 而非 localhost/127.0.0.1：微信开发者工具模拟器对
+ * localhost/127.0.0.1 的 http 请求存在拦截问题（TCP 连得上但请求不转发，表现为 8s 超时），
+ * 用真实局域网 IP 可绕过。换电脑开发时请改此 IP，或运行时覆盖：
+ *   uni.setStorageSync('apiBase', 'http://你的IP:3000/api/v1')
  * 该缓存读取放在请求拦截器里（惰性求值），既支持运行时切换，
  * 又避免在模块加载阶段访问 uni（jsdom 测试环境下 uni 尚未注入）。
  */
-const DEFAULT_API_BASE = 'http://localhost:3000/api/v1';
+const DEFAULT_API_BASE = 'http://192.168.31.158:3000/api/v1';
 
 // baseURL 在拦截器中按需解析，构造时给一个占位，避免顶层访问 uni。
 const http = new Request({
