@@ -178,8 +178,20 @@ export class WorkOrdersService {
     if (elderId) where.elderId = elderId;
     if (assigneeId) where.assigneeId = assigneeId;
 
-    // District isolation
-    if (requester.role !== Role.ADMIN) {
+    // 按角色隔离：FAMILY 只看关联老人的工单，worker 保持 district 隔离
+    if (requester.role === Role.FAMILY) {
+      const links = await this.prisma.elderFamilyLink.findMany({
+        where: { userId: requester.sub },
+        select: { elderId: true },
+      });
+      const elderIds = links.map((l: any) => l.elderId);
+      // 越权防护：若传了 elderId 但不在自己的关联列表内，拒绝
+      if (elderId && !elderIds.includes(elderId)) {
+        throw new ForbiddenException('无权限查看此老人的工单');
+      }
+      where.elderId = { in: elderIds };
+    } else if (requester.role !== Role.ADMIN) {
+      // worker 保持原有 district 隔离
       where.elder = { district: requester.district ?? '' };
     } else if (district) {
       where.elder = { district };
