@@ -20,54 +20,51 @@ import { useAuthStore } from '@/stores/auth';
 const auth = useAuthStore();
 const loading = ref(false);
 
+// 统一角色路由：消除原 enterApp 内两处重复的 if-else
+async function routeByRole() {
+  // FAMILY 需先确保老人身份就绪
+  if (auth.isElder) {
+    await auth.ensureElders();
+  }
+  if (auth.isWorker || auth.isAdmin) {
+    uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
+  } else if (auth.isElder) {
+    if (auth.currentElderId) {
+      uni.redirectTo({ url: '/pagesElder/check-in/index' });
+    } else {
+      uni.redirectTo({ url: '/pagesElder/bind/index' }); // 未绑定引导
+    }
+  } else {
+    const role = auth.user?.role || '无';
+    uni.showToast({ title: `未知角色(${role})，请联系管理员`, icon: 'none', duration: 3000 });
+  }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
+
 async function enterApp() {
   loading.value = true;
   try {
-    // 确保已获取用户信息（8 秒超时，避免长时间等待）
     if (!auth.user) {
-      await Promise.race([
-        auth.fetchUser(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-      ]);
+      await withTimeout(auth.fetchUser(), 8000);
     }
-
-    if (auth.isWorker || auth.isAdmin) {
-      uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
-    } else if (auth.isElder) {
-      uni.redirectTo({ url: '/pagesElder/check-in/index' });
-    } else {
-      const role = auth.user?.role || '无';
-      uni.showToast({
-        title: `未知角色(${role})，请联系管理员`,
-        icon: 'none',
-        duration: 3000,
-      });
-    }
+    await routeByRole();
   } catch {
     // fetchUser 失败（token 过期 / 网络超时 / 服务器不可达）
     if (auth.isAuthenticated) {
-      uni.showToast({ title: '网络异常，请检查后端服务', icon: 'none' });
+      uni.showToast({ title: '网络异常，请检查后端服务（localhost:3000）', icon: 'none' });
       return;
     }
     // token 无效或不存在，触发微信登录
     try {
       const { code } = await uniLogin();
-      await Promise.race([
-        auth.login(code),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-      ]);
-      if (auth.isWorker || auth.isAdmin) {
-        uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
-      } else if (auth.isElder) {
-        uni.redirectTo({ url: '/pagesElder/check-in/index' });
-      } else {
-        const role = auth.user?.role || '无';
-        uni.showToast({
-          title: `未知角色(${role})，请联系管理员`,
-          icon: 'none',
-          duration: 3000,
-        });
-      }
+      await withTimeout(auth.login(code), 8000);
+      await routeByRole();
     } catch (e: any) {
       const msg = e?.message === 'timeout' ? '网络超时，请确认后端已启动' : (e?.message || '登录失败');
       uni.showToast({ title: msg, icon: 'none' });
@@ -87,16 +84,10 @@ function uniLogin(): Promise<{ code: string }> {
 }
 
 onMounted(() => {
-  // 只在已有完整会话（token + user 均已缓存）时自动跳转
-  // 不做网络请求 — 避免接口不通时阻塞页面导致 timeout
+  // 只在已有完整会话（token + user 均已缓存）时自动跳转，不联网
   if (auth.isAuthenticated && auth.user) {
-    if (auth.isWorker || auth.isAdmin) {
-      uni.redirectTo({ url: '/pagesWorker/risk-tasks/index' });
-    } else if (auth.isElder) {
-      uni.redirectTo({ url: '/pagesElder/check-in/index' });
-    }
+    routeByRole();
   }
-  // 否则展示首页，用户点击按钮后触发 enterApp()
 });
 </script>
 
