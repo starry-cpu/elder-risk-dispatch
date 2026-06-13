@@ -303,4 +303,30 @@ describe('EldersService', () => {
       expect(result).toHaveLength(1);
     });
   });
+
+  describe('findMine', () => {
+    it('should return elders linked to the requesting FAMILY user', async () => {
+      mockPrisma.elderFamilyLink.findMany.mockResolvedValue([
+        { elderId: 'e-1', elder: { id: 'e-1', name: '张大爷', serviceLevel: 'HIGH', district: '朝阳区' } },
+        { elderId: 'e-2', elder: { id: 'e-2', name: '李奶奶', serviceLevel: 'NORMAL', district: '朝阳区' } },
+      ]);
+
+      const result = await service.findMine({ sub: 'user-1', role: Role.FAMILY });
+
+      expect(mockPrisma.elderFamilyLink.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        include: { elder: { select: { id: true, name: true, serviceLevel: true, district: true } } },
+      });
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0]).toEqual({ id: 'e-1', name: '张大爷', serviceLevel: 'HIGH', district: '朝阳区' });
+    });
+
+    it('should return empty items when user has no family links', async () => {
+      mockPrisma.elderFamilyLink.findMany.mockResolvedValue([]);
+
+      const result = await service.findMine({ sub: 'orphan-user', role: Role.FAMILY });
+
+      expect(result.items).toEqual([]);
+    });
+  });
 });

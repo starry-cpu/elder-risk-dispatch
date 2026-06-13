@@ -43,6 +43,13 @@ export class EldersController {
     return this.eldersService.findAll({ page, limit, district, serviceLevel }, user);
   }
 
+  // 必须在 @Get(':id') 之前，否则 'mine' 会被当成 :id 参数
+  @Get('mine')
+  @ApiOperation({ summary: '查询当前家属关联的老人列表' })
+  findMine(@CurrentUser() user: any) {
+    return this.eldersService.findMine(user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '老人详情（敏感字段按角色解密）' })
   findById(@Param('id') id: string, @CurrentUser() user: any) {
