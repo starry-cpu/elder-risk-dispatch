@@ -18,8 +18,9 @@
         @touchend="stopVoice"
       >
         <text class="checkin-card__icon">{{ isRecording ? '🔴' : '🎤' }}</text>
-        <text class="checkin-card__title">{{ isRecording ? '松开发送' : '长按语音报平安' }}</text>
-        <text v-if="isRecording" class="checkin-card__hint">{{ duration }}s</text>
+        <text class="checkin-card__title">{{ uploading ? '发送中...' : (isRecording ? '松开发送' : '长按语音报平安') }}</text>
+        <text v-if="uploading" class="checkin-card__hint">正在上传语音</text>
+        <text v-else-if="isRecording" class="checkin-card__hint">{{ duration }}s</text>
         <text v-else class="checkin-card__hint">按住说话</text>
       </view>
 
@@ -49,16 +50,19 @@ import AppButton from '@/components/AppButton.vue';
 import { useCheckIn } from '@/composables/useCheckIn';
 import { useSosVoice } from '@/composables/useSosVoice';
 import { checkInsApi } from '@/api/check-ins';
+import { uploadApi } from '@/api/upload';
+import { useAuthStore } from '@/stores/auth';
 
+const auth = useAuthStore();
 const { validate } = useCheckIn();
-const { isRecording, duration, startRecording, stopRecording } = useSosVoice();
+const { isRecording, duration, recordedFilePath, startRecording, stopRecording } = useSosVoice();
 const textContent = ref('');
-const elderId = ref(uni.getStorageSync('elderId') || '');
 const submitting = ref(false);
+const uploading = ref(false);
 
 async function submitCheckIn(method: string) {
   const result = validate({
-    elderId: elderId.value,
+    elderId: auth.currentElderId,
     method,
     content: method === 'TEXT' ? textContent.value : undefined,
     voiceUrl: undefined,
@@ -70,14 +74,14 @@ async function submitCheckIn(method: string) {
   submitting.value = true;
   try {
     await checkInsApi.create({
-      elderId: elderId.value,
+      elderId: auth.currentElderId,
       method,
       content: method === 'TEXT' ? textContent.value : undefined,
     });
     uni.showToast({ title: '已报平安 ✅' });
     textContent.value = '';
   } catch {
-    // client interceptor already shows toast
+    uni.showToast({ title: '提交失败，请重试', icon: 'none' });
   } finally {
     submitting.value = false;
   }
@@ -93,18 +97,30 @@ function stopVoice() {
     uni.showToast({ title: '录音时间太短', icon: 'none' });
     return;
   }
-  // Submit VOICE check-in with placeholder voiceUrl (see TODO in sos/index.vue)
-  const tempUrl = 'recorded_audio_' + Date.now();
-  checkInsApi.create({
-    elderId: elderId.value,
-    method: 'VOICE',
-    content: '语音报平安',
-    voiceUrl: tempUrl,
-  }).then(() => {
-    uni.showToast({ title: '已报平安 ✅' });
-  }).catch(() => {
-    // client interceptor already shows toast
-  });
+  // 等 onStop 回调写入 recordedFilePath（下一 tick）
+  uploading.value = true;
+  setTimeout(async () => {
+    const filePath = recordedFilePath.value;
+    if (!filePath) {
+      uni.showToast({ title: '录音失败，请重试', icon: 'none' });
+      uploading.value = false;
+      return;
+    }
+    try {
+      const { url } = await uploadApi.uploadAudio(filePath);
+      await checkInsApi.create({
+        elderId: auth.currentElderId,
+        method: 'VOICE',
+        content: '语音报平安',
+        voiceUrl: url,
+      });
+      uni.showToast({ title: '已报平安 ✅' });
+    } catch {
+      uni.showToast({ title: '语音提交失败，请重试', icon: 'none' });
+    } finally {
+      uploading.value = false;
+    }
+  }, 200);
 }
 </script>
 
