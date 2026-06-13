@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authApi } from '@/api/auth';
+import { eldersApi } from '@/api/elders';
+import type { ElderBrief } from '@/composables/useElderIdentity';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(uni.getStorageSync('token') || '');
@@ -8,13 +10,19 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<{ id: string; name: string; role: string } | null>(
     uni.getStorageSync('user') || null
   );
+  // 当前家属关联的老人列表 + 选中的老人 id（取代散落的 getStorageSync('elderId')）
+  const elders = ref<ElderBrief[]>(uni.getStorageSync('elders') || []);
+  const currentElderId = ref<string>(uni.getStorageSync('currentElderId') || '');
+  const currentElder = computed(() =>
+    elders.value.find((e) => e.id === currentElderId.value) || null,
+  );
   const loading = ref(false);
   const isAuthenticated = computed(() => token.value.length > 0);
   const isWorker = computed(() =>
     user.value?.role === 'GRID_WORKER' || user.value?.role === 'COMMUNITY_DOCTOR' ||
     user.value?.role === 'PROPERTY' || user.value?.role === 'VOLUNTEER');
-  const isElder = computed(() =>
-    user.value?.role === 'FAMILY' || user.value?.role === 'ELDER');
+  // 仅 FAMILY 视为老人端用户（ELDER 角色为遗留死代码，已移除）
+  const isElder = computed(() => user.value?.role === 'FAMILY');
   const isAdmin = computed(() => user.value?.role === 'ADMIN');
 
   function setToken(t: string) { token.value = t; uni.setStorageSync('token', t); }
@@ -24,11 +32,37 @@ export const useAuthStore = defineStore('auth', () => {
     if (u) uni.setStorageSync('user', u);
     else uni.removeStorageSync('user');
   }
+  function setCurrentElder(id: string) {
+    currentElderId.value = id;
+    uni.setStorageSync('currentElderId', id);
+  }
+  // 拉取当前家属关联的老人列表，并自动选中第一个（仅对 FAMILY 生效）
+  async function ensureElders() {
+    if (!isElder.value) return;
+    // 已有列表则不再重复拉取（节省带宽；管理员后台新增关联需重新登录后生效）
+    if (elders.value.length > 0) return;
+    try {
+      const res = await eldersApi.findMine();
+      const items = (res as any)?.data?.data?.items ?? [];
+      elders.value = items;
+      uni.setStorageSync('elders', items);
+      if (items.length > 0 && !currentElderId.value) {
+        setCurrentElder(items[0].id);
+      }
+    } catch (e) {
+      console.warn('[auth] ensureElders failed', e);
+      elders.value = [];
+    }
+  }
   function logout() {
     token.value = '';
     user.value = null;
+    elders.value = [];
+    currentElderId.value = '';
     uni.removeStorageSync('token');
     uni.removeStorageSync('user');
+    uni.removeStorageSync('elders');
+    uni.removeStorageSync('currentElderId');
   }
 
   // /auth/me 返回 JwtPayload（{ sub, loginType, role, district }），
@@ -47,7 +81,10 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await authApi.wechatLogin(code);
       const data = (res as any)?.data?.data;
       if (data?.token) setToken(data.token);
-      if (data?.user) setUser(normalizeUser(data.user));
+      if (data?.user) {
+        setUser(normalizeUser(data.user));
+        await ensureElders();
+      }
     } finally {
       loading.value = false;
     }
@@ -56,8 +93,15 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchUser() {
     const res = await authApi.getMe();
     const data = (res as any)?.data?.data;
-    if (data) setUser(normalizeUser(data));
+    if (data) {
+      setUser(normalizeUser(data));
+      await ensureElders();
+    }
   }
 
-  return { token, user, loading, isAuthenticated, isWorker, isElder, isAdmin, setToken, setUser, logout, login, fetchUser };
+  return {
+    token, user, elders, currentElderId, currentElder, loading,
+    isAuthenticated, isWorker, isElder, isAdmin,
+    setToken, setUser, setCurrentElder, ensureElders, logout, login, fetchUser,
+  };
 });
