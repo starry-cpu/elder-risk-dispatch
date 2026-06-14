@@ -51,6 +51,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { onHide, onUnload } from '@dcloudio/uni-app';
 import AppNavbar from '@/components/AppNavbar.vue';
 import { useSosVoice } from '@/composables/useSosVoice';
 import { checkInsApi } from '@/api/check-ins';
@@ -58,18 +59,22 @@ import { uploadApi } from '@/api/upload';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
-const { isRecording, duration, maxDuration, recordedFilePath, startRecording, stopRecording } = useSosVoice();
+const { isRecording, duration, maxDuration, recordedFilePath, startRecording, stopRecording, dispose: disposeRecorder } = useSosVoice();
 const uploading = ref(false);
 const sent = ref(false);
 const showElderPicker = ref(false);
+// action 携带 id 以便重名老人也能精确选中（避免 first-match 选错）
 const elderActions = computed(() =>
   auth.elders.map((e) => ({
     name: e.name,
     color: e.id === auth.currentElderId ? '#7A8B6E' : '#2C2B29',
+    elderId: e.id,
   })),
 );
-function onElderSelect({ item }: { item: { name: string } }) {
-  const found = auth.elders.find((e) => e.name === item.name);
+function onElderSelect({ item }: { item: { name: string; elderId?: string } }) {
+  const found = item.elderId
+    ? auth.elders.find((e) => e.id === item.elderId)
+    : auth.elders.find((e) => e.name === item.name);
   if (found) auth.setCurrentElder(found.id);
   showElderPicker.value = false;
 }
@@ -111,6 +116,11 @@ function handleTouchEnd() {
     }
   }, 200);
 }
+
+// 离开页面（切后台/返回/跳转）时停掉录音与计时器，
+// 否则全局 RecorderManager 会话与 setInterval 会跨页面泄漏。
+onHide(disposeRecorder);
+onUnload(disposeRecorder);
 </script>
 
 <style scoped>

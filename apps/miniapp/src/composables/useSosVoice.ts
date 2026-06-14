@@ -68,6 +68,19 @@ export function useSosVoice() {
     }
   }
 
+  /**
+   * 页面离开（onHide / onUnload）时彻底释放录音资源：
+   * - clear() 只清状态与计时器，不会真正停掉正在进行的录音会话；
+   * - 这里补一次幂等的 recorder.stop()，避免麦克风指示灯长亮、录音会话占用
+   *   导致下次录音失败（RecorderManager 为全局单例，监听器随页面长存）。
+   */
+  function dispose() {
+    if (isRecording.value) {
+      stopRecording();
+    }
+    clear();
+  }
+
   return {
     isRecording,
     duration,
@@ -77,5 +90,6 @@ export function useSosVoice() {
     startRecording,
     stopRecording,
     clear,
+    dispose,
   };
 }
