@@ -11,6 +11,7 @@ describe('AuthController', () => {
     wechatLogin: jest.fn(),
     wechatLoginWithCode: jest.fn(),
     adminLogin: jest.fn(),
+    workerLogin: jest.fn(),
     validateUser: jest.fn(),
   };
 
@@ -44,6 +45,18 @@ describe('AuthController', () => {
         user: { id: '2', name: 'Admin', role: Role.ADMIN },
       });
       const result = await controller.adminLogin({ phone: '13800138000', password: 'pass' });
+      expect(result).toHaveProperty('token');
+    });
+  });
+
+  describe('POST /auth/worker-login', () => {
+    it('should delegate to service.workerLogin and return token + user', async () => {
+      mockAuthService.workerLogin.mockResolvedValue({
+        token: 'jwt-token',
+        user: { id: '3', name: '陈秀英', role: Role.GRID_WORKER },
+      });
+      const result = await controller.workerLogin({ phone: '13901100001', password: 'worker123' });
+      expect(mockAuthService.workerLogin).toHaveBeenCalledWith({ phone: '13901100001', password: 'worker123' });
       expect(result).toHaveProperty('token');
     });
   });

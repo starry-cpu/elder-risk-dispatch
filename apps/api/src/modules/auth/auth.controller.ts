@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { WechatLoginDto } from './dto/wechat-login.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
+import { WorkerLoginDto } from './dto/worker-login.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from './strategies/jwt.strategy';
@@ -27,6 +28,14 @@ export class AuthController {
   @Auditable('AUTH', 'LOGIN', { logRequestBody: true, sensitiveFields: ['password'] })
   adminLogin(@Body() dto: AdminLoginDto) {
     return this.authService.adminLogin(dto);
+  }
+
+  @Public()
+  @Post('worker-login')
+  @ApiOperation({ summary: '工作人员手机号+密码登录（小程序端，演示用）' })
+  @Auditable('AUTH', 'LOGIN', { logRequestBody: true, sensitiveFields: ['password'] })
+  workerLogin(@Body() dto: WorkerLoginDto) {
+    return this.authService.workerLogin(dto);
   }
 
   @Get('me')

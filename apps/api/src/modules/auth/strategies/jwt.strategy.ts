@@ -12,7 +12,7 @@ import { Role } from '@prisma/client';
  */
 export interface JwtPayload {
   sub: string;
-  loginType: 'wechat' | 'admin';
+  loginType: 'wechat' | 'admin' | 'worker';
   role: Role;
   district?: string;
 }

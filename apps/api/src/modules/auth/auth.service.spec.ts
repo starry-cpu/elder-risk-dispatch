@@ -132,6 +132,113 @@ describe('AuthService', () => {
     });
   });
 
+  describe('workerLogin', () => {
+    it('should return token and worker user for valid credentials', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'worker-1',
+        phoneHash,
+        phone: 'encrypted-phone',
+        name: '陈秀英',
+        role: Role.GRID_WORKER,
+        passwordHash: hash,
+        district: '朝阳',
+        skills: ['LIFE', 'HEALTH'],
+        dutyStatus: 'ON_DUTY',
+        createdAt: new Date(),
+      });
+
+      const result = await service.workerLogin({ phone: '13901100001', password: 'worker123' });
+      expect(mockCrypto.hashPhone).toHaveBeenCalledWith('13901100001');
+      expect(result).toHaveProperty('token');
+      expect(result.user.role).toBe(Role.GRID_WORKER);
+    });
+
+    it('should allow COMMUNITY_DOCTOR / PROPERTY / VOLUNTEER roles', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      for (const role of [Role.COMMUNITY_DOCTOR, Role.PROPERTY, Role.VOLUNTEER]) {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'worker-x',
+          phoneHash,
+          name: '员工',
+          role,
+          passwordHash: hash,
+        });
+        const result = await service.workerLogin({ phone: '13901100009', password: 'worker123' });
+        expect(result.user.role).toBe(role);
+      }
+    });
+
+    it('should throw for invalid password', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'worker-1',
+        phoneHash,
+        name: '陈秀英',
+        role: Role.GRID_WORKER,
+        passwordHash: hash,
+      });
+      await expect(
+        service.workerLogin({ phone: '13901100001', password: 'wrong' }),
+      ).rejects.toThrow();
+    });
+
+    it('should throw when user not found', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      await expect(
+        service.workerLogin({ phone: '13900000000', password: 'worker123' }),
+      ).rejects.toThrow();
+    });
+
+    it('should reject FAMILY role (must use wechat)', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'family-1',
+        phoneHash,
+        name: '家属',
+        role: Role.FAMILY,
+        passwordHash: hash,
+      });
+      await expect(
+        service.workerLogin({ phone: '13900139000', password: 'worker123' }),
+      ).rejects.toThrow();
+    });
+
+    it('should reject ADMIN role (must use admin-login)', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'admin-1',
+        phoneHash,
+        name: '管理员',
+        role: Role.ADMIN,
+        passwordHash: hash,
+      });
+      await expect(
+        service.workerLogin({ phone: '13800138000', password: 'worker123' }),
+      ).rejects.toThrow();
+    });
+
+    it('should NOT expose passwordHash / openid in sanitized response', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'worker-1',
+        phoneHash,
+        phone: 'encrypted-phone',
+        openid: 'secret-openid-should-not-leak',
+        name: '陈秀英',
+        role: Role.GRID_WORKER,
+        passwordHash: hash,
+        district: '朝阳',
+        skills: [],
+        dutyStatus: 'ON_DUTY',
+        createdAt: new Date(),
+      });
+      const result = await service.workerLogin({ phone: '13901100001', password: 'worker123' });
+      expect(result.user).not.toHaveProperty('passwordHash');
+      expect(result.user).not.toHaveProperty('openid');
+    });
+  });
+
   describe('wechatLogin', () => {
     it('should return token for wechat user', async () => {
       mockPrisma.user.upsert.mockResolvedValue({
