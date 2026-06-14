@@ -37,16 +37,25 @@ export const useAuthStore = defineStore('auth', () => {
     currentElderId.value = id;
     uni.setStorageSync('currentElderId', id);
   }
-  // 拉取当前家属关联的老人列表，并自动选中第一个（仅对 FAMILY 生效）
-  async function ensureElders() {
+  // 拉取当前家属关联的老人列表，并自动选中第一个（仅对 FAMILY 生效）。
+  // 设计要点：
+  //  - 已有非空缓存则跳过（节省带宽；后台新增关联用 refreshElders() 强制刷新）
+  //  - **空结果不缓存**：首次登录尚未关联老人时拉到 []，不写 storage，
+  //    否则下次冷启动 store 从 storage 读到 []，本函数的缓存守卫会让它
+  //    永远不重拉，导致后台补关联后家属端看不到老人（MIN-B4）
+  async function ensureElders(force = false) {
     if (!isElder.value) return;
-    // 已有列表则不再重复拉取（节省带宽；管理员后台新增关联需重新登录后生效）
-    if (elders.value.length > 0) return;
+    if (!force && elders.value.length > 0) return;
     try {
       const res = await eldersApi.findMine() as HttpResponse<{ items: ElderBrief[] }>;
       const items = res?.data?.data?.items ?? [];
       elders.value = items;
-      uni.setStorageSync('elders', items);
+      // 只有非空才缓存（见上注释）
+      if (items.length > 0) {
+        uni.setStorageSync('elders', items);
+      } else {
+        uni.removeStorageSync('elders');
+      }
       if (items.length > 0 && !currentElderId.value) {
         setCurrentElder(items[0].id);
       }
@@ -54,6 +63,10 @@ export const useAuthStore = defineStore('auth', () => {
       console.warn('[auth] ensureElders failed', e);
       elders.value = [];
     }
+  }
+  // 强制刷新老人列表（bind 页关联成功 / 管理端补关联后调用）
+  function refreshElders() {
+    return ensureElders(true);
   }
   function logout() {
     token.value = '';
@@ -105,6 +118,6 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token, user, elders, currentElderId, currentElder, loading,
     isAuthenticated, isWorker, isElder, isAdmin,
-    setToken, setUser, setCurrentElder, ensureElders, logout, login, fetchUser,
+    setToken, setUser, setCurrentElder, ensureElders, refreshElders, logout, login, fetchUser,
   };
 });
