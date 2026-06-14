@@ -2,8 +2,8 @@
   <view class="page">
     <AppNavbar title="风险待办" />
 
-    <!-- 筛选栏 -->
-    <view class="filter-bar" @click="showPicker = true">
+    <!-- 筛选栏：wd-picker 没有外部 show/visible prop，需通过暴露的 open() 打开 -->
+    <view class="filter-bar" @click="openPicker">
       <text class="filter-bar__label">{{ statusLabel }}</text>
       <text class="filter-bar__arrow">▾</text>
     </view>
@@ -52,8 +52,9 @@
       </view>
     </view>
 
-    <!-- 筛选 Picker -->
+    <!-- 筛选 Picker：通过 ref 暴露的 open() 控制 -->
     <wd-picker
+      ref="pickerRef"
       :columns="[statusColumns]"
       :model-value="[statusFilter]"
       @confirm="onPickerConfirm"
@@ -79,7 +80,8 @@ const { sortItems, filterByStatus } = useRiskTaskList();
 const items = ref<RiskTaskItem[]>([]);
 const statusFilter = ref('');
 const loading = ref(false);
-const showPicker = ref(false);
+// wd-picker 通过 defineExpose 暴露 open()/close()；无外部 show/visible prop
+const pickerRef = ref<{ open: () => void; close: () => void } | null>(null);
 
 const statusColumns = [
   { value: '', label: '全部' },
@@ -104,9 +106,12 @@ function accentColor(level: string): string {
   return '#6E8A9A';
 }
 
+function openPicker() {
+  pickerRef.value?.open();
+}
+
 function onPickerConfirm(e: { value: string[] }) {
   statusFilter.value = e.value[0];
-  showPicker.value = false;
   loadData();
 }
 
