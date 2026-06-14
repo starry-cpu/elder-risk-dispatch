@@ -203,7 +203,7 @@ export class WorkOrdersService {
       where.elder = { district };
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.workOrder.findMany({
         where,
         include: {
@@ -216,6 +216,16 @@ export class WorkOrdersService {
       }),
       this.prisma.workOrder.count({ where }),
     ]);
+
+    // 拍平嵌套关系为扁平字段（前端模板读 elderName/assigneeName/elderId），
+    // 因为 ResponseInterceptor 只包 {code,data,message}，不做关系拍平。
+    const items = rows.map((wo: any) => ({
+      ...wo,
+      elderId: wo.elder?.id ?? wo.elderId,
+      elderName: wo.elder?.name ?? null,
+      assigneeId: wo.assignee?.id ?? wo.assigneeId ?? null,
+      assigneeName: wo.assignee?.name ?? null,
+    }));
 
     return { items, total, page, limit };
   }

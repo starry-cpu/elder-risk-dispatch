@@ -159,7 +159,7 @@ export class RiskService {
       where.elder = { district };
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.riskEvent.findMany({
         where,
         include: { elder: { select: { id: true, name: true, district: true } } },
@@ -169,6 +169,13 @@ export class RiskService {
       }),
       this.prisma.riskEvent.count({ where }),
     ]);
+
+    // 拍平嵌套关系为扁平字段（前端模板读 elderName/elderId）
+    const items = rows.map((ev: any) => ({
+      ...ev,
+      elderId: ev.elder?.id ?? ev.elderId,
+      elderName: ev.elder?.name ?? null,
+    }));
 
     return { items, total, page, limit };
   }
