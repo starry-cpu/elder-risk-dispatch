@@ -29,13 +29,16 @@ export class NotificationsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.GRID_WORKER)
-  async findAll(@Query() query: NotificationQueryDto) {
-    return this.notificationsService.findAll({
-      targetType: query.targetType,
-      targetId: query.targetId,
-      page: query.page ?? 1,
-      limit: query.limit ?? 20,
-    });
+  async findAll(@Query() query: NotificationQueryDto, @CurrentUser() user: any) {
+    return this.notificationsService.findAll(
+      {
+        targetType: query.targetType,
+        targetId: query.targetId,
+        page: query.page ?? 1,
+        limit: query.limit ?? 20,
+      },
+      user,
+    );
   }
 
   @Get('inbox')

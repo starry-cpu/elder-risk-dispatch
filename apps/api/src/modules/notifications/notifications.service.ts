@@ -3,6 +3,13 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { Role } from '@prisma/client';
+
+interface Requester {
+  sub: string;
+  role: Role;
+  district?: string;
+}
 
 interface SendInput {
   targetType: 'USER' | 'ELDER';
@@ -69,13 +76,28 @@ export class NotificationsService {
     return notification;
   }
 
-  async findAll(query: QueryInput) {
-    const { page, limit, targetType, targetId } = query;
+  async findAll(query: QueryInput, requester?: Requester) {
+    const { page, limit } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (targetType) where.targetType = targetType;
-    if (targetId) where.targetId = targetId;
+
+    if (requester && requester.role !== Role.ADMIN) {
+      // 鉴权：非 ADMIN 只能看与本人/本片区相关的通知，避免水平越权读取他人私信。
+      // - USER 类：仅 targetId === 本人 sub
+      // - SYSTEM 类（片区/role 广播）：仅 targetId === 本人片区
+      // 调用方传入的 targetType/targetId 不能用来突破此范围，故忽略之；
+      // ADMIN 不受限，保留显式过滤。
+      const visibleScopes: any[] = [{ targetType: 'USER', targetId: requester.sub }];
+      if (requester.district) {
+        visibleScopes.push({ targetType: 'SYSTEM', targetId: requester.district });
+      }
+      where.OR = visibleScopes;
+    } else {
+      // ADMIN：尊重显式过滤
+      if (query.targetType) where.targetType = query.targetType;
+      if (query.targetId) where.targetId = query.targetId;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.notification.findMany({

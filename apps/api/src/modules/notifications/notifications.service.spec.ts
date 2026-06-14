@@ -4,6 +4,7 @@ import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { Role } from '@prisma/client';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -98,6 +99,38 @@ describe('NotificationsService', () => {
         take: 10,
         orderBy: { createdAt: 'desc' },
       });
+    });
+
+    it('ADMIN 传 requester 时不受可见范围限制（保留显式过滤）', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+      mockPrisma.notification.count.mockResolvedValue(0);
+      const admin = { sub: 'admin-1', role: Role.ADMIN, district: '朝阳区' };
+
+      await service.findAll({ targetType: 'USER', targetId: 'someone-else', page: 1, limit: 10 }, admin);
+
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith({
+        where: { targetType: 'USER', targetId: 'someone-else' },
+        skip: 0,
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+
+    it('非 ADMIN 只能看本人 USER 通知与本片区 SYSTEM 广播（防 IDOR）', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+      mockPrisma.notification.count.mockResolvedValue(0);
+      const worker = { sub: 'worker-1', role: Role.GRID_WORKER, district: '朝阳区' };
+
+      // worker 即便试图查 targetId=someone-else，service 也会忽略该参数并强制可见范围
+      await service.findAll({ targetType: 'USER', targetId: 'someone-else', page: 1, limit: 10 }, worker);
+
+      const call = mockPrisma.notification.findMany.mock.calls[0][0];
+      expect(call.where.OR).toEqual([
+        { targetType: 'USER', targetId: 'worker-1' },
+        { targetType: 'SYSTEM', targetId: '朝阳区' },
+      ]);
+      // 关键：不能把 someone-else 的 USER 通知透传进 where
+      expect(call.where.targetId).toBeUndefined();
     });
   });
 
