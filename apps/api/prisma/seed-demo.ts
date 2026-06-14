@@ -101,11 +101,13 @@ async function main() {
   const adminPwd = await bcrypt.hash('admin123', 10);
 
   // 系统管理员（PC 后台登录用 13800138000 / admin123）
+  // 注意：phone 字段存加密值（展示用），phoneHash 存哈希（登录查找用），两者不同
   await prisma.user.create({
     data: {
       id: id('admin_1'),
       name: '王管理',
-      phone: hashPhone('13800138000'),
+      phone: encryptField('13800138000'),
+      phoneHash: hashPhone('13800138000'),
       passwordHash: adminPwd,
       role: Role.ADMIN,
       district: '朝阳',
@@ -146,7 +148,7 @@ async function main() {
         skills: s.skills,
         dutyStatus: s.duty,
         avgResponseMin: s.avgResp ?? null,
-        ...(s.phone ? { phone: hashPhone(s.phone) } : {}),
+        ...(s.phone ? { phone: encryptField(s.phone), phoneHash: hashPhone(s.phone) } : {}),
       },
     });
   }
