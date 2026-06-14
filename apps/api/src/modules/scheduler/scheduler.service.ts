@@ -51,9 +51,8 @@ export class SchedulerService {
             eventsCreated++;
             if (event.level !== 'LOW') {
               try {
-                await this.notificationsService.send({
-                  targetType: 'USER',
-                  targetId: 'system',
+                await this.notificationsService.sendToRecipients({
+                  elderId: elder.id,
                   templateId: process.env.WECHAT_TEMPLATE_MISSED_CHECKIN,
                   payload: {
                     thing1: { value: elder.name },
@@ -122,9 +121,8 @@ export class SchedulerService {
             escalated++;
 
             try {
-              await this.notificationsService.send({
-                targetType: 'USER',
-                targetId: 'system',
+              await this.notificationsService.sendToRecipients({
+                elderId: wo.elderId,
                 templateId: process.env.WECHAT_TEMPLATE_ESCALATION,
                 payload: {
                   thing1: { value: wo.id },

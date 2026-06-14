@@ -4,11 +4,21 @@ import { WeChatChannel } from './wechat.channel';
 const mockFetch = jest.fn();
 (global as any).fetch = mockFetch;
 
+// WeChatChannel 现在注入 PrismaService 用于 userId->openid 解析。
+// 测试里提供一个 mock prisma：对任意 userId 查询返回一个合法形态的 openid。
+const validOpenid = 'o_abcdefghij0123456789XY'; // 满足 ^o[A-Za-z0-9_-]{20,}$
+const mockPrisma = {
+  user: {
+    findUnique: jest.fn().mockResolvedValue({ openid: validOpenid }),
+  },
+};
+
 describe('WeChatChannel', () => {
   let channel: WeChatChannel;
 
   beforeEach(() => {
     mockFetch.mockReset();
+    mockPrisma.user.findUnique.mockResolvedValue({ openid: validOpenid });
     // By default: mock successful token fetch + send
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('cgi-bin/token')) {
@@ -35,11 +45,11 @@ describe('WeChatChannel', () => {
     process.env.WECHAT_APPID = 'wx-test-appid';
     process.env.WECHAT_SECRET = 'test-secret';
 
-    channel = new WeChatChannel();
+    channel = new WeChatChannel(mockPrisma as any);
 
     const result = await channel.send({
       targetType: 'USER',
-      targetId: 'openid-xxx',
+      targetId: 'openid-xxx', // 非 openid 形态 -> 当 userId 查 -> 拿到 validOpenid
       templateId: 'tmpl-001',
       payload: { thing1: { value: '测试' } },
     });
@@ -52,7 +62,7 @@ describe('WeChatChannel', () => {
     process.env.WECHAT_APPID = 'wx-test-appid';
     process.env.WECHAT_SECRET = 'test-secret';
 
-    channel = new WeChatChannel();
+    channel = new WeChatChannel(mockPrisma as any);
 
     // First send
     await channel.send({
@@ -91,7 +101,7 @@ describe('WeChatChannel', () => {
       });
     });
 
-    channel = new WeChatChannel();
+    channel = new WeChatChannel(mockPrisma as any);
 
     const result = await channel.send({
       targetType: 'USER',
@@ -108,7 +118,7 @@ describe('WeChatChannel', () => {
     delete process.env.WECHAT_APPID;
     delete process.env.WECHAT_SECRET;
 
-    channel = new WeChatChannel();
+    channel = new WeChatChannel(mockPrisma as any);
 
     const result = await channel.send({
       targetType: 'USER',
@@ -125,7 +135,7 @@ describe('WeChatChannel', () => {
     process.env.WECHAT_APPID = 'wx-test-appid';
     process.env.WECHAT_SECRET = 'test-secret';
 
-    channel = new WeChatChannel();
+    channel = new WeChatChannel(mockPrisma as any);
 
     const result = await channel.send({
       targetType: 'USER',
@@ -141,7 +151,7 @@ describe('WeChatChannel', () => {
     process.env.WECHAT_APPID = 'wx-test-appid';
     process.env.WECHAT_SECRET = 'test-secret';
 
-    channel = new WeChatChannel();
+    channel = new WeChatChannel(mockPrisma as any);
 
     // Force token to appear stale
     (channel as any).tokenExpiresAt = Date.now() - 1000;
@@ -155,5 +165,72 @@ describe('WeChatChannel', () => {
 
     // Should have fetched new token + sent
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  describe('userId -> openid 解析', () => {
+    it('targetId 是合法 openid 形态时直接使用，不查库', async () => {
+      process.env.WECHAT_APPID = 'wx-test-appid';
+      process.env.WECHAT_SECRET = 'test-secret';
+      channel = new WeChatChannel(mockPrisma as any);
+      const realOpenid = 'o_ABCDEFGHIJ0123456789XY';
+
+      await channel.send({
+        targetType: 'USER',
+        targetId: realOpenid,
+        templateId: 't1',
+        payload: {},
+      });
+
+      // 直接走 openid，不应查 user
+      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+      // 发往 WeChat 的 touser 即为该 openid
+      const sendCall = mockFetch.mock.calls.find((c) =>
+        String(c[0]).includes('message/subscribe/send'),
+      );
+      const sentBody = JSON.parse((sendCall![1] as any).body);
+      expect(sentBody.touser).toBe(realOpenid);
+    });
+
+    it('targetId 是 userId（非 openid 形态）时查 user.openid 后发送', async () => {
+      process.env.WECHAT_APPID = 'wx-test-appid';
+      process.env.WECHAT_SECRET = 'test-secret';
+      channel = new WeChatChannel(mockPrisma as any);
+
+      await channel.send({
+        targetType: 'USER',
+        targetId: 'user-123', // 不像 openid
+        templateId: 't1',
+        payload: {},
+      });
+
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-123' },
+        select: { openid: true },
+      });
+      const sendCall = mockFetch.mock.calls.find((c) =>
+        String(c[0]).includes('message/subscribe/send'),
+      );
+      const sentBody = JSON.parse((sendCall![1] as any).body);
+      expect(sentBody.touser).toBe(validOpenid);
+    });
+
+    it('用户无 openid（未绑微信）时返回失败，不调 WeChat API', async () => {
+      process.env.WECHAT_APPID = 'wx-test-appid';
+      process.env.WECHAT_SECRET = 'test-secret';
+      mockPrisma.user.findUnique.mockResolvedValueOnce({ openid: null });
+      channel = new WeChatChannel(mockPrisma as any);
+
+      const result = await channel.send({
+        targetType: 'USER',
+        targetId: 'user-nobind',
+        templateId: 't1',
+        payload: {},
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No openid');
+      // 不应实际请求 WeChat
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
   });
 });

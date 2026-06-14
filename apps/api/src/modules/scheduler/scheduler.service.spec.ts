@@ -17,7 +17,7 @@ describe('SchedulerService', () => {
 
   const mockRiskService = { evaluateAndCreateEvent: jest.fn() };
   const mockWorkOrdersService = { escalate: jest.fn() };
-  const mockNotificationsService = { send: jest.fn() };
+  const mockNotificationsService = { send: jest.fn(), sendToRecipients: jest.fn().mockResolvedValue({ recipients: [], notifications: [] }) };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
