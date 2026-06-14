@@ -7,6 +7,10 @@ export interface WorkOrderRecord {
   type: string;
   level: string;
   status: string;
+  /** 工单来源：MANUAL / RISK_DISPATCH / FAMILY_REQUEST / SOS */
+  sourceFrom?: string;
+  /** 家属请求原文（sourceFrom 为 FAMILY_REQUEST/SOS 时有值）*/
+  familyRequestText?: string;
   assigneeId?: string;
   assigneeName?: string;
   deadline?: string;
