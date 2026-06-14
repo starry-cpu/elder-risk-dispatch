@@ -128,7 +128,7 @@ export class SchedulerService {
                   thing2: { value: `工单超时自动升级: ${oldLevel} → ${updated.level}` },
                 },
               });
-            } catch (notifError: any) {
+            } catch (_notifError: any) {
               this.logger.warn(`Failed to enqueue escalation notification for wo ${wo.id}`);
             }
           }

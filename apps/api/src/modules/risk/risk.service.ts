@@ -207,8 +207,8 @@ export class RiskService {
       }
     }
 
-    // familyLinks 仅用于鉴权，不外泄
-    const { familyLinks, ...safeElder } = event.elder as any;
+    // familyLinks 仅用于鉴权，不外泄（前缀 _ 标记为有意剥离）
+    const { familyLinks: _familyLinks, ...safeElder } = event.elder as any;
     return { ...event, elder: safeElder };
   }
 

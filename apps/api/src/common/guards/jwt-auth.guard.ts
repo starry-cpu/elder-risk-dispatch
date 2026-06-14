@@ -18,7 +18,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, info: any) {
+  // info（Passport 的第三参数，如 token 解析细节）在此无需处理；前缀 _ 标记
+  handleRequest(err: any, user: any, _info: any) {
     if (err || !user) {
       throw err || new UnauthorizedException('Token 无效或已过期');
     }

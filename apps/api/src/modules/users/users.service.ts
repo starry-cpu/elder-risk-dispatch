@@ -6,9 +6,6 @@ import * as bcrypt from 'bcryptjs';
 
 interface Requester { sub: string; role: Role; district?: string; }
 
-/** Fields excluded from all API responses */
-const INTERNAL_FIELDS = ['passwordHash', 'openid'];
-
 @Injectable()
 export class UsersService {
   constructor(
@@ -97,7 +94,8 @@ export class UsersService {
   }
 
   private stripInternal(user: any) {
-    const { passwordHash, openid, ...safe } = user;
+    // 剥离敏感字段（前缀 _ 标记为有意丢弃），并屏蔽手机号
+    const { passwordHash: _ph, openid: _op, ...safe } = user;
     return { ...safe, phone: null };
   }
 
