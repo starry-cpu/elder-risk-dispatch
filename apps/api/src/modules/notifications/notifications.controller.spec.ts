@@ -43,7 +43,7 @@ describe('NotificationsController', () => {
   describe('GET /notifications', () => {
     it('should call service.findAll with query params and requester', async () => {
       mockService.findAll.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
-      const admin = { sub: 'admin-1', role: Role.ADMIN, district: '朝阳区' };
+      const admin = { sub: 'admin-1', role: Role.ADMIN, district: '朝阳区', loginType: 'admin' as const };
 
       const result = await controller.findAll({ page: 1, limit: 20 }, admin);
 

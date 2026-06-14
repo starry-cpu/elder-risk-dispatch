@@ -5,7 +5,7 @@ import { CheckInsService } from './check-ins.service';
 import { CreateCheckInDto } from './dto/create-check-in.dto';
 import { QueryCheckInDto } from './dto/query-check-in.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('CheckIns')
 @ApiBearerAuth()
@@ -16,7 +16,7 @@ export class CheckInsController {
   @Post('check-ins')
   @Roles(Role.FAMILY, Role.GRID_WORKER, Role.ADMIN)
   @ApiOperation({ summary: '提交报平安（一键/语音/文本/代填）' })
-  create(@Body() dto: CreateCheckInDto, @CurrentUser() user: any) {
+  create(@Body() dto: CreateCheckInDto, @CurrentUser() user: AuthenticatedUser) {
     return this.checkInsService.create(dto, user);
   }
 
@@ -25,7 +25,7 @@ export class CheckInsController {
   findByElder(
     @Param('id') elderId: string,
     @Query() query: QueryCheckInDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.checkInsService.findByElder(elderId, query, user);
   }

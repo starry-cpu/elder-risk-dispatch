@@ -14,7 +14,7 @@ import { CreateElderDto } from './dto/create-elder.dto';
 import { UpdateElderDto } from './dto/update-elder.dto';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('Elders')
@@ -27,18 +27,18 @@ export class EldersController {
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '创建老人档案' })
   @Auditable('ELDER', 'CREATE', { sensitiveFields: ['idCard', 'phone'] })
-  create(@Body() dto: CreateElderDto, @CurrentUser() user: any) {
+  create(@Body() dto: CreateElderDto, @CurrentUser() user: AuthenticatedUser) {
     return this.eldersService.create(dto, user);
   }
 
   @Get()
   @ApiOperation({ summary: '老人列表（分页+片区+服务等级筛选）' })
   findAll(
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('district') district?: string,
     @Query('serviceLevel') serviceLevel?: ServiceLevel,
-    @CurrentUser() user?: any,
   ) {
     return this.eldersService.findAll({ page, limit, district, serviceLevel }, user);
   }
@@ -46,13 +46,13 @@ export class EldersController {
   // 必须在 @Get(':id') 之前，否则 'mine' 会被当成 :id 参数
   @Get('mine')
   @ApiOperation({ summary: '查询当前家属关联的老人列表' })
-  findMine(@CurrentUser() user: any) {
+  findMine(@CurrentUser() user: AuthenticatedUser) {
     return this.eldersService.findMine(user);
   }
 
   @Get(':id')
   @ApiOperation({ summary: '老人详情（敏感字段按角色解密）' })
-  findById(@Param('id') id: string, @CurrentUser() user: any) {
+  findById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.eldersService.findById(id, user);
   }
 
@@ -60,26 +60,26 @@ export class EldersController {
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '更新老人档案' })
   @Auditable('ELDER', 'UPDATE', { resourceIdParam: 'id', sensitiveFields: ['idCard', 'phone'] })
-  update(@Param('id') id: string, @Body() dto: UpdateElderDto, @CurrentUser() user: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateElderDto, @CurrentUser() user: AuthenticatedUser) {
     return this.eldersService.update(id, dto, user);
   }
 
   @Post(':id/contacts')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '添加紧急联系人' })
-  addContact(@Param('id') elderId: string, @Body() dto: CreateContactDto, @CurrentUser() user: any) {
+  addContact(@Param('id') elderId: string, @Body() dto: CreateContactDto, @CurrentUser() user: AuthenticatedUser) {
     return this.eldersService.addContact(elderId, dto, user);
   }
 
   @Get(':id/contacts')
   @ApiOperation({ summary: '查看紧急联系人' })
-  getContacts(@Param('id') elderId: string, @CurrentUser() user: any) {
+  getContacts(@Param('id') elderId: string, @CurrentUser() user: AuthenticatedUser) {
     return this.eldersService.getContacts(elderId, user);
   }
 
   @Get(':id/risk-profile')
   @ApiOperation({ summary: '风险画像聚合' })
-  getRiskProfile(@Param('id') elderId: string, @CurrentUser() user: any) {
+  getRiskProfile(@Param('id') elderId: string, @CurrentUser() user: AuthenticatedUser) {
     return this.eldersService.getRiskProfile(elderId, user);
   }
 

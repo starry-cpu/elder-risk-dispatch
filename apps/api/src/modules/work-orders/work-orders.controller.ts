@@ -8,7 +8,7 @@ import { AssignWorkOrderDto } from './dto/assign-work-order.dto';
 import { CompleteWorkOrderDto } from './dto/complete-work-order.dto';
 import { ReassignWorkOrderDto } from './dto/reassign-work-order.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('WorkOrders')
@@ -20,19 +20,19 @@ export class WorkOrdersController {
   @Post('work-orders')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '创建工单，返回派单推荐作为建议' })
-  create(@Body() dto: CreateWorkOrderDto, @CurrentUser() user: any) {
+  create(@Body() dto: CreateWorkOrderDto, @CurrentUser() user: AuthenticatedUser) {
     return this.workOrdersService.create(dto, user);
   }
 
   @Get('work-orders')
   @ApiOperation({ summary: '分页查询工单列表' })
-  findAll(@Query() query: QueryWorkOrdersDto, @CurrentUser() user: any) {
+  findAll(@Query() query: QueryWorkOrdersDto, @CurrentUser() user: AuthenticatedUser) {
     return this.workOrdersService.findAll(query as any, user);
   }
 
   @Get('work-orders/:id')
   @ApiOperation({ summary: '查看工单详情（含时间线+评价）' })
-  findById(@Param('id') id: string, @CurrentUser() user: any) {
+  findById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.workOrdersService.findById(id, user);
   }
 
@@ -43,14 +43,14 @@ export class WorkOrdersController {
   assign(
     @Param('id') id: string,
     @Body() dto: AssignWorkOrderDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.workOrdersService.assign(id, dto.assigneeId, user);
   }
 
   @Post('work-orders/:id/start')
   @ApiOperation({ summary: '接单者标记开始处理' })
-  start(@Param('id') id: string, @CurrentUser() user: any) {
+  start(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.workOrdersService.start(id, user);
   }
 
@@ -60,7 +60,7 @@ export class WorkOrdersController {
   complete(
     @Param('id') id: string,
     @Body() dto: CompleteWorkOrderDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.workOrdersService.complete(id, dto, user);
   }
@@ -71,7 +71,7 @@ export class WorkOrdersController {
   cancel(
     @Param('id') id: string,
     @Body() dto: { reason?: string },
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.workOrdersService.cancel(id, dto.reason, user);
   }
@@ -82,14 +82,14 @@ export class WorkOrdersController {
   reassign(
     @Param('id') id: string,
     @Body() dto: ReassignWorkOrderDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.workOrdersService.reassign(id, dto.newAssigneeId, dto.reason, user);
   }
 
   @Get('work-orders/:id/timeline')
   @ApiOperation({ summary: '查看工单时间线' })
-  getTimeline(@Param('id') id: string, @CurrentUser() user: any) {
+  getTimeline(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.workOrdersService.getTimeline(id, user);
   }
 }

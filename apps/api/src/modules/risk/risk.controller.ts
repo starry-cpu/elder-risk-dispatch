@@ -7,7 +7,7 @@ import { EvaluateRiskDto } from './dto/evaluate-risk.dto';
 import { ReviewRiskEventDto } from './dto/review-risk-event.dto';
 import { QueryRiskEventsDto } from './dto/query-risk-events.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('Risk')
@@ -19,7 +19,7 @@ export class RiskController {
   @Post('risk/evaluate')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '手动触发风险评估并生成 RiskEvent' })
-  async evaluate(@Body() dto: EvaluateRiskDto, @CurrentUser() user: any) {
+  async evaluate(@Body() dto: EvaluateRiskDto, @CurrentUser() user: AuthenticatedUser) {
     // 鉴权：在评估前校验调用者对该 elderId 有片区权限，避免 IDOR 越权评估
     await this.riskService.assertCanEvaluate(dto.elderId, user);
     return this.riskService.evaluateAndCreateEvent(dto as any);
@@ -27,13 +27,13 @@ export class RiskController {
 
   @Get('risk/events')
   @ApiOperation({ summary: '查询风险事件列表（分页+过滤）' })
-  findAll(@Query() query: QueryRiskEventsDto, @CurrentUser() user: any) {
+  findAll(@Query() query: QueryRiskEventsDto, @CurrentUser() user: AuthenticatedUser) {
     return this.riskService.findAll(query as any, user);
   }
 
   @Get('risk/events/:id')
   @ApiOperation({ summary: '查看风险事件详情' })
-  findById(@Param('id') id: string, @CurrentUser() user: any) {
+  findById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.riskService.findById(id, user);
   }
 
@@ -44,7 +44,7 @@ export class RiskController {
   review(
     @Param('id') id: string,
     @Body() dto: ReviewRiskEventDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.riskService.reviewEvent(id, dto.status, user.sub, dto.note);
   }

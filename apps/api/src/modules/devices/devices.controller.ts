@@ -5,7 +5,7 @@ import { DeviceDataDto } from './dto/device-data.dto';
 import { QueryDeviceDto } from './dto/query-device.dto';
 import { HmacGuard } from './hmac/hmac.guard';
 import { Public } from '../../common/decorators/public.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Devices')
 @Controller()
@@ -26,7 +26,7 @@ export class DevicesController {
   findByElder(
     @Param('id') elderId: string,
     @Query() query: QueryDeviceDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.devicesService.findByElder(elderId, query, user);
   }

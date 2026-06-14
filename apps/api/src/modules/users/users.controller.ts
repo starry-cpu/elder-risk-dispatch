@@ -5,7 +5,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../audit/decorators/auditable.decorator';
 
 @ApiTags('Users')
@@ -17,7 +17,7 @@ export class UsersController {
   @Post()
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: '创建用户' })
-  create(@Body() dto: CreateUserDto, @CurrentUser() user: any) {
+  create(@Body() dto: CreateUserDto, @CurrentUser() user: AuthenticatedUser) {
     return this.usersService.create(dto, user);
   }
 
@@ -30,7 +30,7 @@ export class UsersController {
 
   @Get(':id')
   @ApiOperation({ summary: '用户详情' })
-  findById(@Param('id') id: string, @CurrentUser() user: any) {
+  findById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.usersService.findById(id, user);
   }
 
@@ -44,7 +44,7 @@ export class UsersController {
 
   @Patch(':id/duty')
   @ApiOperation({ summary: '切换在岗/离岗状态' })
-  updateDutyStatus(@Param('id') id: string, @Body('dutyStatus') dutyStatus: DutyStatus, @CurrentUser() user: any) {
+  updateDutyStatus(@Param('id') id: string, @Body('dutyStatus') dutyStatus: DutyStatus, @CurrentUser() user: AuthenticatedUser) {
     return this.usersService.updateDutyStatus(id, dutyStatus, user);
   }
 }
