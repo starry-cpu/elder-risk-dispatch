@@ -3,6 +3,13 @@
     <view class="home__content">
       <text class="home__title">照护调度</text>
       <text class="home__subtitle">为老人提供更安全的照护服务</text>
+
+      <!-- 已有会话：显示当前账号 + 切换账号（演示者可切到工作人员登录） -->
+      <view v-if="auth.isAuthenticated && auth.user" class="home__session">
+        <text class="home__session-text">当前账号：{{ auth.user.name }}</text>
+        <AppButton type="text" size="compact" @click="switchAccount">切换账号</AppButton>
+      </view>
+
       <view class="home__actions">
         <AppButton type="primary" size="full" :loading="loading" @click="enterApp">
           {{ loading ? '加载中...' : '进入工作台' }}
@@ -49,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import AppButton from '@/components/AppButton.vue';
 import { useAuthStore } from '@/stores/auth';
 
@@ -136,6 +143,16 @@ function cancelWorkerForm() {
   workerPwd.value = '';
 }
 
+// 切换账号：登出当前会话并停在登录页，让用户选「进入工作台」或「工作人员登录」。
+// 解决演示痛点：之前 onMounted 自动 routeByRole() 会用 storage 里残留的家属会话
+// 直接跳走，挡住工作人员登录入口。
+function switchAccount() {
+  auth.logout();
+  showWorkerForm.value = false;
+  workerPhone.value = '';
+  workerPwd.value = '';
+}
+
 function uniLogin(): Promise<{ code: string }> {
   return new Promise((resolve, reject) => {
     uni.login({
@@ -145,12 +162,10 @@ function uniLogin(): Promise<{ code: string }> {
   });
 }
 
-onMounted(() => {
-  // 只在已有完整会话（token + user 均已缓存）时自动跳转，不联网
-  if (auth.isAuthenticated && auth.user) {
-    routeByRole();
-  }
-});
+// 注意：不在 onMounted 里自动 routeByRole()。
+// 自动跳转会让冷启动时残留会话（如家属）直接跳走，演示者无法切到工作人员登录。
+// 改为停留本页，由用户点「进入工作台」主动进入，或点「切换账号」后选工作人员登录。
+
 </script>
 
 <style scoped>
@@ -183,6 +198,22 @@ onMounted(() => {
 }
 .home__actions {
   width: 100%;
+}
+.home__session {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  width: 100%;
+  margin-bottom: 32rpx;
+  padding: 16rpx 24rpx;
+  background-color: #FFFFFF;
+  border: 1.5rpx solid #E8E3DA;
+  border-radius: 12rpx;
+}
+.home__session-text {
+  font-size: 26rpx;
+  color: #6B6760;
 }
 .home__worker-toggle {
   margin-top: 16rpx;
