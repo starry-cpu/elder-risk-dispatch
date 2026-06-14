@@ -78,6 +78,14 @@ enum WorkOrderStatus {
   CANCELLED
 }
 
+/// 工单来源：区分是手动建单、风险派单、家属请求还是紧急求助
+enum WorkOrderSource {
+  MANUAL
+  RISK_DISPATCH
+  FAMILY_REQUEST
+  SOS
+}
+
 model User {
   id             String      @id @default(cuid())
   openid         String?     @unique
@@ -144,14 +152,18 @@ model ElderFamilyLink {
 }
 
 model CheckIn {
-  id        String        @id @default(cuid())
-  elderId   String
-  method    CheckInMethod
-  content   String?
-  voiceUrl  String?
-  status    CheckInStatus @default(NORMAL)
-  createdAt DateTime      @default(now())
-  elder     Elder         @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  id          String        @id @default(cuid())
+  elderId     String
+  method      CheckInMethod
+  content     String?
+  voiceUrl    String?
+  status      CheckInStatus @default(NORMAL)
+  /// 标记来源：FAMILY 报平安 / FAMILY_REQUEST 家属请求帮助（文字输入需求）
+  source      String        @default("FAMILY")
+  /// 家属请求帮助时输入的原文（区别于 content 的固定文案如「语音报平安」）
+  requestText String?
+  createdAt   DateTime      @default(now())
+  elder       Elder         @relation(fields: [elderId], references: [id], onDelete: Cascade)
 
   @@index([elderId, createdAt])
 }
@@ -203,24 +215,28 @@ model RiskEvent {
 }
 
 model WorkOrder {
-  id             String             @id @default(cuid())
-  riskEventId    String?            @unique
-  elderId        String
-  type           WorkOrderType
-  level          RiskLevel
-  assigneeId     String?
-  status         WorkOrderStatus    @default(PENDING)
-  deadline       DateTime?
-  dispatchReason String?
-  result         String?
-  completedAt    DateTime?
-  createdById    String
-  createdAt      DateTime           @default(now())
-  elder          Elder              @relation(fields: [elderId], references: [id], onDelete: Cascade)
-  riskEvent      RiskEvent?         @relation(fields: [riskEventId], references: [id])
-  assignee       User?              @relation("assignee", fields: [assigneeId], references: [id])
-  timeline       WorkOrderTimeline[]
-  evaluation     ServiceEvaluation?
+  id                String           @id @default(cuid())
+  riskEventId       String?          @unique
+  elderId           String
+  type              WorkOrderType
+  level             RiskLevel
+  assigneeId        String?
+  status            WorkOrderStatus  @default(PENDING)
+  deadline          DateTime?
+  dispatchReason    String?
+  result            String?
+  completedAt       DateTime?
+  createdById       String
+  /// 工单来源（手动建单/风险派单/家属请求/紧急求助）
+  sourceFrom        WorkOrderSource  @default(MANUAL)
+  /// 家属请求时输入的原文（用于工单详情展示给 worker）
+  familyRequestText String?
+  createdAt         DateTime         @default(now())
+  elder             Elder            @relation(fields: [elderId], references: [id], onDelete: Cascade)
+  riskEvent         RiskEvent?       @relation(fields: [riskEventId], references: [id])
+  assignee          User?            @relation("assignee", fields: [assigneeId], references: [id])
+  timeline          WorkOrderTimeline[]
+  evaluation        ServiceEvaluation?
 
   @@index([status, deadline])
 }
