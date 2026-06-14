@@ -9,6 +9,7 @@ describe('RiskController', () => {
 
   const mockRiskService = {
     evaluateAndCreateEvent: jest.fn(),
+    assertCanEvaluate: jest.fn().mockResolvedValue(undefined),
     findAll: jest.fn(),
     findById: jest.fn(),
     reviewEvent: jest.fn(),
@@ -24,7 +25,7 @@ describe('RiskController', () => {
   });
 
   describe('evaluate', () => {
-    it('应调用 service.evaluateAndCreateEvent 并返回结果', async () => {
+    it('应先鉴权再调用 service.evaluateAndCreateEvent 并返回结果', async () => {
       const dto = {
         elderId: 'elder-1',
         hoursSinceLastCheckIn: 25,
@@ -32,12 +33,15 @@ describe('RiskController', () => {
         abnormalText: false,
         age: 75, hasChronicDisease: false, recentHighRisk: false,
       };
+      const admin = { sub: 'admin-1', role: Role.ADMIN, district: '朝阳区' };
       mockRiskService.evaluateAndCreateEvent.mockResolvedValue({
         id: 're-1', score: 40, level: RiskLevel.MEDIUM, status: RiskStatus.PENDING_REVIEW,
       });
 
-      const result = await controller.evaluate(dto);
+      const result = await controller.evaluate(dto, admin);
       expect(result).toBeDefined();
+      // 鉴权先于评估
+      expect(mockRiskService.assertCanEvaluate).toHaveBeenCalledWith('elder-1', admin);
       expect(mockRiskService.evaluateAndCreateEvent).toHaveBeenCalledWith(dto);
     });
   });

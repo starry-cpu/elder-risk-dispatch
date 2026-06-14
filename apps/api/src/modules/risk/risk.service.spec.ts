@@ -178,4 +178,73 @@ describe('RiskService', () => {
       ).rejects.toThrow('不存在');
     });
   });
+
+  describe('assertCanEvaluate (POST /risk/evaluate 鉴权)', () => {
+    it('ADMIN 放行', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue({ district: '海淀区' });
+      await expect(service.assertCanEvaluate('elder-1', admin)).resolves.toBeUndefined();
+    });
+
+    it('跨片区 worker 拒绝（防 IDOR 越权评估）', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue({ district: '海淀区' }); // 老人在海淀
+      await expect(service.assertCanEvaluate('elder-1', worker)).rejects.toThrow('不存在');
+      // worker.district === '朝阳区'
+    });
+
+    it('无片区的 worker 拒绝（避免全表可达）', async () => {
+      const districtlessWorker = { sub: 'w-x', role: Role.GRID_WORKER, district: undefined };
+      mockPrisma.elder.findUnique.mockResolvedValue({ district: '朝阳区' });
+      await expect(service.assertCanEvaluate('elder-1', districtlessWorker)).rejects.toThrow('不存在');
+    });
+
+    it('老人不存在抛出 NotFound', async () => {
+      mockPrisma.elder.findUnique.mockResolvedValue(null);
+      await expect(service.assertCanEvaluate('nope', worker)).rejects.toThrow('不存在');
+    });
+  });
+
+  describe('findById (GET /risk/events/:id 鉴权 + 脱敏)', () => {
+    const eventWithElder = {
+      ...mockRiskEvent,
+      elder: {
+        id: 'elder-1', name: '张大爷', gender: 'M', district: '朝阳区',
+        serviceLevel: ServiceLevel.HIGH,
+        familyLinks: [{ userId: 'family-1' }, { userId: 'family-other' }],
+      },
+      workOrder: { id: 'wo-1', status: 'PENDING', type: 'URGENT', level: 'HIGH' },
+    };
+
+    it('FAMILY 关联老人可查看，且 familyLinks 不外泄', async () => {
+      mockPrisma.riskEvent.findUnique.mockResolvedValue(eventWithElder);
+
+      const result = await service.findById('re-1', familyUser);
+
+      expect(result.elder.id).toBe('elder-1');
+      // familyLinks 仅用于鉴权，必须从响应中剔除
+      expect(result.elder.familyLinks).toBeUndefined();
+    });
+
+    it('FAMILY 非关联老人拒绝（防跨家属越权 + PII 泄露）', async () => {
+      mockPrisma.riskEvent.findUnique.mockResolvedValue(eventWithElder);
+      const unrelatedFamily = { sub: 'family-stranger', role: Role.FAMILY, district: undefined };
+
+      await expect(service.findById('re-1', unrelatedFamily)).rejects.toThrow('不存在');
+    });
+
+    it('跨片区 worker 拒绝', async () => {
+      mockPrisma.riskEvent.findUnique.mockResolvedValue(eventWithElder);
+
+      await expect(service.findById('re-1', otherWorker)).rejects.toThrow('不存在');
+    });
+
+    it('ADMIN 可查看且 familyLinks 被剔除', async () => {
+      mockPrisma.riskEvent.findUnique.mockResolvedValue(eventWithElder);
+
+      const result = await service.findById('re-1', admin);
+      expect(result.elder.familyLinks).toBeUndefined();
+      // 只 select 了安全字段：不含 idCard/address 密文
+      expect(result.elder.idCard).toBeUndefined();
+      expect(result.elder.address).toBeUndefined();
+    });
+  });
 });

@@ -19,7 +19,9 @@ export class RiskController {
   @Post('risk/evaluate')
   @Roles(Role.ADMIN, Role.GRID_WORKER)
   @ApiOperation({ summary: '手动触发风险评估并生成 RiskEvent' })
-  evaluate(@Body() dto: EvaluateRiskDto) {
+  async evaluate(@Body() dto: EvaluateRiskDto, @CurrentUser() user: any) {
+    // 鉴权：在评估前校验调用者对该 elderId 有片区权限，避免 IDOR 越权评估
+    await this.riskService.assertCanEvaluate(dto.elderId, user);
     return this.riskService.evaluateAndCreateEvent(dto as any);
   }
 
