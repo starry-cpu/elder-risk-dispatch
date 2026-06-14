@@ -109,8 +109,10 @@ const riskProfile = ref<
   }>
 >([]);
 
+// 显式标注为元组，避免 TS 把源推断成 (boolean | ElderDetail|null)[] 导致解构时
+// elder 被收窄成 boolean（这也是 v-tsc 之前的报错根因）。
 watch(
-  () => [props.visible, props.elder],
+  () => [props.visible, props.elder] as [boolean, ElderDetail | null],
   async ([v, elder]) => {
     if (v && elder) {
       const res = await eldersApi.getRiskProfile(elder.id);
