@@ -3,7 +3,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { DispatchRecommendationService } from '../risk/dispatch-recommendation.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkOrderStateMachine } from './work-orders.state-machine';
-import { WorkOrderType, WorkOrderStatus, RiskStatus, Role, RiskLevel } from '@prisma/client';
+import { WorkOrderType, WorkOrderStatus, RiskStatus, Role, RiskLevel, WorkOrderSource } from '@prisma/client';
 
 export interface Requester {
   sub: string;
@@ -77,6 +77,10 @@ export class WorkOrdersService {
       level?: RiskLevel;
       deadline?: string;
       dispatchReason?: string;
+      /** 工单来源（默认 MANUAL）；家属请求自动派单时传 FAMILY_REQUEST */
+      sourceFrom?: WorkOrderSource;
+      /** 家属请求原文（来源为 FAMILY_REQUEST/SOS 时写入，展示给 worker）*/
+      familyRequestText?: string;
     },
     requester: Requester,
   ) {
@@ -122,6 +126,8 @@ export class WorkOrdersService {
         deadline: input.deadline ? new Date(input.deadline) : null,
         dispatchReason: input.dispatchReason ?? null,
         createdById: requester.sub,
+        sourceFrom: input.sourceFrom ?? WorkOrderSource.MANUAL,
+        familyRequestText: input.familyRequestText ?? null,
       },
     });
 

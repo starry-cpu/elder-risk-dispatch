@@ -3,11 +3,21 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { Role, CheckInMethod } from '@prisma/client';
+import {
+  Role,
+  CheckInMethod,
+  WorkOrderType,
+  RiskLevel,
+  WorkOrderSource,
+} from '@prisma/client';
 import { AiService, isAbnormalTextResult } from '../ai/ai.service';
 import { RiskService } from '../risk/risk.service';
+import { WorkOrdersService } from '../work-orders/work-orders.service';
+import { DispatchRecommendationService } from '../risk/dispatch-recommendation.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface Requester {
   sub: string;
@@ -15,12 +25,31 @@ interface Requester {
   district?: string;
 }
 
+// 系统身份：家属请求派单时，建单/派单/通知都是系统行为（非家属本人），
+// 用 role=ADMIN 绕过 work-orders 的片区/角色校验。
+const SYSTEM_REQUESTER: Requester = { sub: 'system', role: Role.ADMIN };
+
+// AI 分类结果 → 默认工单 level 映射（家属请求通常不紧急）
+const TYPE_DEFAULT_LEVEL: Record<string, RiskLevel> = {
+  HEALTH: RiskLevel.HIGH,
+  LIFE: RiskLevel.MEDIUM,
+  REPAIR: RiskLevel.MEDIUM,
+  ESCORT: RiskLevel.MEDIUM,
+  COMPANION: RiskLevel.LOW,
+  ERRAND: RiskLevel.LOW,
+};
+
 @Injectable()
 export class CheckInsService {
+  private readonly logger = new Logger(CheckInsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly riskService: RiskService,
+    private readonly workOrdersService: WorkOrdersService,
+    private readonly dispatchRecommendation: DispatchRecommendationService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: { elderId: string; method: CheckInMethod; content?: string; voiceUrl?: string }, requester: Requester) {
@@ -67,6 +96,160 @@ export class CheckInsService {
     }
 
     return checkIn;
+  }
+
+  /**
+   * 家属请求帮助：家属输入自由文本（如「水管坏了需要人修」），
+   * AI 分类 → 推荐有空的同片区 worker → 自动建单 + 指派 + 通知。
+   *
+   * 全自动派单，但有多个降级路径保证可用性（AI 挂了/无在岗 worker/低置信度都建单）。
+   * 返回结果让前端知道是「已自动派单」还是「转人工」。
+   */
+  async createFamilyRequest(
+    input: { elderId: string; text: string },
+    requester: Requester,
+  ): Promise<{
+    checkIn: any;
+    workOrder: any;
+    aiClassification: { type: string; confidence: number } | null;
+    dispatched: boolean;
+    reason: string;
+  }> {
+    // 1. 校验：仅 FAMILY 且有 family-link 关联可发起请求
+    if (requester.role !== Role.FAMILY) {
+      throw new ForbiddenException('仅家属可发起帮助请求');
+    }
+    const elder = await this.prisma.elder.findUnique({
+      where: { id: input.elderId },
+      include: { familyLinks: true },
+    });
+    if (!elder) throw new NotFoundException('老人不存在');
+    const linked = elder.familyLinks?.some((fl: any) => fl.userId === requester.sub);
+    if (!linked) throw new ForbiddenException('无权限为此老人发起请求');
+
+    // 2. 落 CheckIn（记录家属请求，区别于普通报平安）
+    const checkIn = await this.prisma.checkIn.create({
+      data: {
+        elderId: input.elderId,
+        method: CheckInMethod.TEXT,
+        content: input.text,
+        requestText: input.text,
+        source: 'FAMILY_REQUEST',
+        status: 'NORMAL',
+      },
+    });
+
+    // 3. AI 分类
+    let aiClassification: { type: string; confidence: number } | null = null;
+    let classifyType: WorkOrderType = WorkOrderType.LIFE; // 兜底默认
+    let lowConfidence = true;
+    try {
+      const result = await this.aiService.classify(input.text);
+      aiClassification = { type: result.type, confidence: result.confidence };
+      lowConfidence = result.needsHumanReview || result.confidence < 0.6;
+      // AI type 已与 WorkOrderType 枚举对齐
+      if (Object.values(WorkOrderType).includes(result.type as WorkOrderType)) {
+        classifyType = result.type as WorkOrderType;
+      }
+    } catch (e: any) {
+      // DeepSeek 挂了 / 合规拦截：不阻塞，走默认 LIFE + 转人工
+      this.logger.warn(`AI classify failed for family request, fallback to manual: ${e?.message ?? e}`);
+      lowConfidence = true;
+    }
+
+    // 4. 降级分支：低置信度 → 建工单但不自动指派，转人工
+    if (lowConfidence) {
+      const wo = await this.workOrdersService.create(
+        {
+          elderId: input.elderId,
+          type: classifyType,
+          level: RiskLevel.LOW,
+          sourceFrom: WorkOrderSource.FAMILY_REQUEST,
+          familyRequestText: input.text,
+          dispatchReason: `AI 置信度低${aiClassification ? `(${aiClassification.confidence.toFixed(2)})` : '(AI 不可用)'}，需人工确认类型`,
+        },
+        SYSTEM_REQUESTER,
+      );
+      return {
+        checkIn,
+        workOrder: wo.workOrder,
+        aiClassification,
+        dispatched: false,
+        reason: '已转人工派单：AI 无法确定请求类型，工作人员将尽快处理',
+      };
+    }
+
+    // 5. 正常派单路径：推荐 + 自动指派
+    let candidates: Awaited<ReturnType<typeof this.dispatchRecommendation.recommendByType>> = [];
+    try {
+      candidates = await this.dispatchRecommendation.recommendByType(input.elderId, classifyType);
+    } catch (e: any) {
+      this.logger.warn(`recommendByType failed: ${e?.message ?? e}`);
+    }
+    // 取 top1 且在岗且同片区
+    const elderDistrict = elder.district;
+    const topCandidate = candidates.find(
+      (c) => c.dutyStatus === 'ON_DUTY' && c.district === elderDistrict,
+    );
+
+    if (!topCandidate) {
+      // 暂无在岗同片区 worker：建工单 PENDING，转人工
+      const wo = await this.workOrdersService.create(
+        {
+          elderId: input.elderId,
+          type: classifyType,
+          level: TYPE_DEFAULT_LEVEL[classifyType] ?? RiskLevel.MEDIUM,
+          sourceFrom: WorkOrderSource.FAMILY_REQUEST,
+          familyRequestText: input.text,
+          dispatchReason: '暂无在岗同片区工作人员，待人工派单',
+        },
+        SYSTEM_REQUESTER,
+      );
+      return {
+        checkIn,
+        workOrder: wo.workOrder,
+        aiClassification,
+        dispatched: false,
+        reason: '已转人工派单：暂无在岗同片区工作人员',
+      };
+    }
+
+    // 6. 建工单 + 自动指派 + 通知（全自动）
+    const wo = await this.workOrdersService.create(
+      {
+        elderId: input.elderId,
+        type: classifyType,
+        level: TYPE_DEFAULT_LEVEL[classifyType] ?? RiskLevel.MEDIUM,
+        sourceFrom: WorkOrderSource.FAMILY_REQUEST,
+        familyRequestText: input.text,
+        dispatchReason: `AI 分类: ${classifyType} (${aiClassification!.confidence.toFixed(2)})，自动派给 ${topCandidate.name}`,
+      },
+      SYSTEM_REQUESTER,
+    );
+    await this.workOrdersService.assign(wo.workOrder.id, topCandidate.userId, SYSTEM_REQUESTER);
+
+    // 通知 worker（家属本人也收到一条 USER 通知）
+    try {
+      await this.notificationsService.sendToRecipients({
+        elderId: input.elderId,
+        payload: {
+          thing1: { value: elder.name },
+          thing2: { value: `新工单: ${input.text}` },
+          thing3: { value: `派给 ${topCandidate.name}` },
+        },
+      });
+    } catch (e: any) {
+      // 通知失败不阻塞派单（工单已建已派）
+      this.logger.warn(`sendToRecipients failed for family request: ${e?.message ?? e}`);
+    }
+
+    return {
+      checkIn,
+      workOrder: wo.workOrder,
+      aiClassification,
+      dispatched: true,
+      reason: `已自动派给 ${topCandidate.name}（${classifyType}）`,
+    };
   }
 
   async findByElder(elderId: string, query: { page?: number; limit?: number }, requester: Requester) {
