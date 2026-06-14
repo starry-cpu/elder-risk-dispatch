@@ -82,27 +82,21 @@
       </view>
     </template>
 
-    <!-- 完成弹窗 -->
-    <wd-message-box v-model="resultDialogVisible" title="填写处理结果">
+    <!-- 完成弹窗：wd-message-box 是命令式组件，由 useMessage(selector) 控制；
+         v-model/title/footer slot 都不是有效 prop，原写法导致弹窗永远打不开 -->
+    <wd-message-box selector="complete-result">
       <textarea
         v-model="resultText"
         style="width: 100%; min-height: 160rpx; font-size: 28rpx; padding: 12rpx 0;"
         placeholder="请描述处理结果..."
       />
-      <template #footer>
-        <AppButton size="compact" type="text" @click="resultDialogVisible = false">
-          取消
-        </AppButton>
-        <AppButton size="compact" type="primary" @click="submitResult">
-          确认
-        </AppButton>
-      </template>
     </wd-message-box>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useMessage } from 'wot-design-uni';
 import AppNavbar from '@/components/AppNavbar.vue';
 import AppStatusDot from '@/components/AppStatusDot.vue';
 import AppButton from '@/components/AppButton.vue';
@@ -113,10 +107,12 @@ import { formatTime } from '@/utils/format';
 
 const { getAvailableActions, validateCompletion } = useWorkOrderFlow();
 
+// wd-message-box 通过 useMessage(selector) 命令式驱动（selector 用于多实例隔离）
+const message = useMessage('complete-result');
+
 const order = ref<any>(null);
 const timeline = ref<any[]>([]);
 const resultText = ref('');
-const resultDialogVisible = ref(false);
 const loading = ref(false);
 
 const availableActions = computed(() =>
@@ -161,7 +157,32 @@ async function loadDetail() {
 
 async function handleAction(action: string) {
   if (action === 'COMPLETE') {
-    resultDialogVisible.value = true;
+    if (!order.value) return;
+    // 每次打开重置输入，避免上一次的残留
+    resultText.value = '';
+    // message.confirm：确认 resolve、取消/蒙层 reject。
+    // 用 beforeConfirm 做本地校验——校验不过时 resolve(false) 阻止弹窗关闭。
+    try {
+      await message.confirm({
+        title: '填写处理结果',
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        beforeConfirm: ({ resolve }) => {
+          const validation = validateCompletion(resultText.value);
+          if (!validation.valid) {
+            uni.showToast({ title: validation.message || '请填写处理结果', icon: 'none' });
+            resolve(false);
+            return;
+          }
+          resolve(true);
+        },
+      });
+    } catch {
+      // 用户取消，不做任何提交
+      return;
+    }
+    // 走到这里说明 beforeConfirm 通过且用户点了确认
+    await completeOrder();
     return;
   }
   if (!order.value) return;
@@ -179,17 +200,11 @@ async function handleAction(action: string) {
   }
 }
 
-async function submitResult() {
+async function completeOrder() {
   if (!order.value) return;
-  const validation = validateCompletion(resultText.value);
-  if (!validation.valid) {
-    uni.showToast({ title: validation.message || '请填写处理结果', icon: 'none' });
-    return;
-  }
   try {
     await workOrdersApi.complete(order.value.id, { result: resultText.value });
     uni.showToast({ title: '已完成' });
-    resultDialogVisible.value = false;
     loadDetail();
   } catch {
     // client interceptor already shows toast
