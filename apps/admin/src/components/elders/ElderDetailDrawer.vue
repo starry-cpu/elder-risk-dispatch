@@ -11,7 +11,7 @@
           {{ elder.name }}
         </el-descriptions-item>
         <el-descriptions-item label="性别">
-          {{ elder.gender === 'M' ? '男' : '女' }}
+          {{ genderLabel(elder.gender) }}
         </el-descriptions-item>
         <el-descriptions-item label="出生日期">
           {{
@@ -88,6 +88,7 @@ import { ref, watch } from 'vue';
 import dayjs from 'dayjs';
 import { eldersApi } from '@/api';
 import type { ElderDetail } from '@/api/elders';
+import { genderLabel } from '@/utils/elders';
 
 const props = defineProps<{
   visible: boolean;
