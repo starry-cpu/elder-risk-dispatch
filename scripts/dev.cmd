@@ -85,6 +85,11 @@ exit /b 1
 :do_env
 if exist "%API_DIR%\.env" (
   echo [v] apps\api\.env already exists, skip
+) else if exist "%ROOT_DIR%\.env" (
+  REM 根目录 .env 可能含开发者填入的真实密钥（DB/JWT/微信等），优先复用，
+  REM 而不是从 .env.example（空模板）拷贝。
+  copy "%ROOT_DIR%\.env" "%API_DIR%\.env" >nul
+  echo [v] copied root .env (with real values) to apps\api\.env
 ) else (
   copy "%ROOT_DIR%\.env.example" "%API_DIR%\.env" >nul
   echo [v] copied .env.example to apps\api\.env

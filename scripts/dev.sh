@@ -114,6 +114,11 @@ cmd_env() {
   log "初始化 apps/api/.env ..."
   if [ -f "$API_DIR/.env" ]; then
     ok "已存在 apps/api/.env，跳过（如需覆盖请手动删除）"
+  elif [ -f "$ROOT_DIR/.env" ]; then
+    # 根目录 .env 可能含开发者填入的真实密钥（DB/JWT/微信等），优先复用，
+    # 而不是从 .env.example（空模板）拷贝。
+    cp "$ROOT_DIR/.env" "$API_DIR/.env"
+    ok "已从根目录 .env（含真实值）拷贝到 apps/api/.env"
   else
     cp "$ROOT_DIR/.env.example" "$API_DIR/.env"
     ok "已从 .env.example 拷贝到 apps/api/.env"
