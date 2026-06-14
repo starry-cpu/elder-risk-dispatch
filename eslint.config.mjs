@@ -19,6 +19,9 @@ export default [
       },
       globals: {
         ...globals.node,
+        // Express 全局命名空间由 @types/multer 提供（用于 Express.Multer.File 类型），
+        // 运行时不存在该变量，仅为 TS 类型；声明为 readonly 避免 no-undef 误报。
+        Express: 'readonly',
       },
     },
     plugins: {
