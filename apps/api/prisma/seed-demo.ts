@@ -99,6 +99,8 @@ async function main() {
   console.log('▶ 插入 Users...');
 
   const adminPwd = await bcrypt.hash('admin123', 10);
+  // 工作人员统一密码（演示用，便于小程序 worker-login 不换微信号登任意 worker）
+  const workerPwd = await bcrypt.hash('worker123', 10);
 
   // 系统管理员（PC 后台登录用 13800138000 / admin123）
   // 注意：phone 字段存加密值（展示用），phoneHash 存哈希（登录查找用），两者不同
@@ -148,6 +150,8 @@ async function main() {
         skills: s.skills,
         dutyStatus: s.duty,
         avgResponseMin: s.avgResp ?? null,
+        // 统一密码 worker123，配合 POST /auth/worker-login（演示免换微信号）
+        passwordHash: workerPwd,
         ...(s.phone ? { phone: encryptField(s.phone), phoneHash: hashPhone(s.phone) } : {}),
       },
     });
@@ -496,6 +500,7 @@ async function main() {
 
   console.log('✓ 演示数据填充完成');
   console.log('  管理端登录：13800138000 / admin123');
+  console.log('  工作人员登录：13901100001(陈秀英) / worker123（worker-login）');
   console.log('  小程序：你的微信账号已关联 张桂兰(elder_1)、王秀珍(elder_3)');
 }
 
