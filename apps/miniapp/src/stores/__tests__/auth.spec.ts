@@ -8,8 +8,15 @@ vi.mock('@/api/elders', () => ({
   },
 }));
 
+vi.mock('@/api/auth', () => ({
+  authApi: {
+    workerLogin: vi.fn(),
+  },
+}));
+
 // 延迟引入，使 vi.mock 优先生效
 const { eldersApi } = await import('@/api/elders');
+const { authApi } = await import('@/api/auth');
 
 vi.stubGlobal('uni', {
   getStorageSync: vi.fn(() => ''),
@@ -57,6 +64,34 @@ describe('useAuthStore (miniapp)', () => {
     expect(store.elders).toEqual([]);
     expect(uni.removeStorageSync).toHaveBeenCalledWith('currentElderId');
     expect(uni.removeStorageSync).toHaveBeenCalledWith('elders');
+  });
+
+  describe('loginWithPassword', () => {
+    it('stores token + user on success', async () => {
+      (authApi.workerLogin as any).mockResolvedValue({
+        data: { data: { token: 'jwt-1', user: { id: 'w1', name: '陈秀英', role: 'GRID_WORKER' } } },
+      });
+      const store = useAuthStore();
+      await store.loginWithPassword('13901100001', 'worker123');
+      expect(authApi.workerLogin).toHaveBeenCalledWith('13901100001', 'worker123');
+      expect(store.token).toBe('jwt-1');
+      expect(store.user).toEqual({ id: 'w1', name: '陈秀英', role: 'GRID_WORKER' });
+      expect(store.isWorker).toBe(true);
+    });
+
+    it('throws on api failure so the login page can show a toast', async () => {
+      (authApi.workerLogin as any).mockRejectedValue(new Error('手机号或密码错误'));
+      const store = useAuthStore();
+      await expect(store.loginWithPassword('13901100001', 'wrong')).rejects.toThrow('手机号或密码错误');
+      // 失败不应写入任何凭据
+      expect(store.isAuthenticated).toBe(false);
+    });
+
+    it('throws when response envelope is malformed', async () => {
+      (authApi.workerLogin as any).mockResolvedValue({ data: { data: {} } });
+      const store = useAuthStore();
+      await expect(store.loginWithPassword('13901100001', 'worker123')).rejects.toThrow();
+    });
   });
 
   describe('ensureElders', () => {

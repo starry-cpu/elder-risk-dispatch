@@ -8,6 +8,42 @@
           {{ loading ? '加载中...' : '进入工作台' }}
         </AppButton>
       </view>
+
+      <!-- 工作人员手机号+密码登录（演示用，免换微信号即可登任意 worker） -->
+      <AppButton
+        v-if="!showWorkerForm"
+        type="text"
+        size="compact"
+        class="home__worker-toggle"
+        @click="showWorkerForm = true"
+      >
+        工作人员登录
+      </AppButton>
+      <view v-else class="worker-form">
+        <input
+          v-model="workerPhone"
+          class="worker-form__input"
+          type="number"
+          placeholder="手机号"
+          maxlength="11"
+        />
+        <input
+          v-model="workerPwd"
+          class="worker-form__input"
+          password
+          placeholder="密码"
+        />
+        <AppButton
+          type="primary"
+          size="full"
+          :loading="workerLoading"
+          :disabled="!workerPhone || !workerPwd"
+          @click="submitWorkerLogin"
+        >
+          {{ workerLoading ? '登录中...' : '登录' }}
+        </AppButton>
+        <AppButton type="text" size="compact" @click="cancelWorkerForm">取消</AppButton>
+      </view>
     </view>
   </view>
 </template>
@@ -19,6 +55,12 @@ import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
 const loading = ref(false);
+
+// 工作人员表单状态
+const showWorkerForm = ref(false);
+const workerPhone = ref('');
+const workerPwd = ref('');
+const workerLoading = ref(false);
 
 // 统一角色路由：消除原 enterApp 内两处重复的 if-else
 async function routeByRole() {
@@ -74,6 +116,26 @@ async function enterApp() {
   }
 }
 
+// 工作人员密码登录：失败时抛错已被 store 透传，这里 toast 提示
+async function submitWorkerLogin() {
+  workerLoading.value = true;
+  try {
+    await auth.loginWithPassword(workerPhone.value.trim(), workerPwd.value);
+    await routeByRole();
+  } catch (e: any) {
+    const msg = e?.message || '登录失败，请检查手机号或密码';
+    uni.showToast({ title: msg, icon: 'none' });
+  } finally {
+    workerLoading.value = false;
+  }
+}
+
+function cancelWorkerForm() {
+  showWorkerForm.value = false;
+  workerPhone.value = '';
+  workerPwd.value = '';
+}
+
 function uniLogin(): Promise<{ code: string }> {
   return new Promise((resolve, reject) => {
     uni.login({
@@ -121,5 +183,25 @@ onMounted(() => {
 }
 .home__actions {
   width: 100%;
+}
+.home__worker-toggle {
+  margin-top: 16rpx;
+}
+.worker-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16rpx;
+  width: 100%;
+  margin-top: 24rpx;
+}
+.worker-form__input {
+  height: 80rpx;
+  padding: 0 24rpx;
+  background-color: #FFFFFF;
+  border: 1.5rpx solid #E8E3DA;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  color: #2C2B29;
 }
 </style>

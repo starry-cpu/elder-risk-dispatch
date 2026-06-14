@@ -106,6 +106,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 工作人员手机号+密码登录（演示用）。与 login() 不同：抛出异常让登录页提示错误，
+  // 因表单登录不像微信登录可静默重试。成功后由调用方决定 routeByRole()。
+  async function loginWithPassword(phone: string, password: string) {
+    loading.value = true;
+    try {
+      const res = await authApi.workerLogin(phone, password) as HttpResponse<{ token: string; user: RawUser }>;
+      const data = res?.data?.data;
+      if (!data?.token || !data?.user) {
+        throw new Error('登录响应异常');
+      }
+      setToken(data.token);
+      setUser(normalizeUser(data.user));
+      await ensureElders();
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function fetchUser() {
     const res = await authApi.getMe() as HttpResponse<RawUser>;
     const data = res?.data?.data;
@@ -118,6 +136,6 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token, user, elders, currentElderId, currentElder, loading,
     isAuthenticated, isWorker, isElder, isAdmin,
-    setToken, setUser, setCurrentElder, ensureElders, refreshElders, logout, login, fetchUser,
+    setToken, setUser, setCurrentElder, ensureElders, refreshElders, logout, login, loginWithPassword, fetchUser,
   };
 });
