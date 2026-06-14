@@ -52,6 +52,19 @@ function wrap<T>(promise: Promise<{ data: { code: number; data: T; message: stri
   return promise;
 }
 
+/**
+ * 后端统一响应包络（与 ResponseInterceptor 对齐）。
+ * 各 store/composable 解析 luch-request 响应时用本类型替代 `as any`。
+ */
+export interface Envelope<T> {
+  code: number;
+  data: T;
+  message: string;
+}
+export interface HttpResponse<T> {
+  data: Envelope<T>;
+}
+
 export default http;
 export { wrap };
 export { DEFAULT_API_BASE as API_BASE };

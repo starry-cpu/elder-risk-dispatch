@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authApi } from '@/api/auth';
 import { eldersApi } from '@/api/elders';
+import type { HttpResponse } from '@/api/client';
 import type { ElderBrief } from '@/composables/useElderIdentity';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -42,8 +43,8 @@ export const useAuthStore = defineStore('auth', () => {
     // 已有列表则不再重复拉取（节省带宽；管理员后台新增关联需重新登录后生效）
     if (elders.value.length > 0) return;
     try {
-      const res = await eldersApi.findMine();
-      const items = (res as any)?.data?.data?.items ?? [];
+      const res = await eldersApi.findMine() as HttpResponse<{ items: ElderBrief[] }>;
+      const items = res?.data?.data?.items ?? [];
       elders.value = items;
       uni.setStorageSync('elders', items);
       if (items.length > 0 && !currentElderId.value) {
@@ -66,8 +67,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // /auth/me 返回 JwtPayload（{ sub, loginType, role, district }），
-  // 而前端按 { id, name, role } 消费。这里做一次字段归一化。
-  function normalizeUser(data: any): { id: string; name: string; role: string } {
+  // /auth/wechat-login 返回 sanitized user（{ id, name, role, ... }）。
+  // 前端按 { id, name, role } 消费，这里做一次字段归一化兼容两种形状。
+  type RawUser = Partial<{ id: string; sub: string; name: string; loginType: string; role: string }>;
+  function normalizeUser(data: RawUser): { id: string; name: string; role: string } {
     return {
       id: data?.id ?? data?.sub ?? '',
       name: data?.name ?? data?.loginType ?? '用户',
@@ -78,8 +81,8 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(code: string) {
     loading.value = true;
     try {
-      const res = await authApi.wechatLogin(code);
-      const data = (res as any)?.data?.data;
+      const res = await authApi.wechatLogin(code) as HttpResponse<{ token: string; user: RawUser }>;
+      const data = res?.data?.data;
       if (data?.token) setToken(data.token);
       if (data?.user) {
         setUser(normalizeUser(data.user));
@@ -91,8 +94,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchUser() {
-    const res = await authApi.getMe();
-    const data = (res as any)?.data?.data;
+    const res = await authApi.getMe() as HttpResponse<RawUser>;
+    const data = res?.data?.data;
     if (data) {
       setUser(normalizeUser(data));
       await ensureElders();
