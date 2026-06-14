@@ -440,6 +440,11 @@ export class WorkOrdersService {
       orderBy: { createdAt: 'asc' },
     });
   }
+  /**
+   * 超时自动升级工单 level（LOW→MEDIUM→HIGH）。
+   * 仅由 SchedulerService.escalateTimeouts 在"已派单/处理中且超时"场景调用——
+   * 调用方负责用 status 过滤确保不升级 PENDING/终态工单。
+   */
   async escalate(id: string) {
     const wo = await this.prisma.workOrder.findUnique({
       where: { id },

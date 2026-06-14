@@ -103,7 +103,10 @@ export class SchedulerService {
       const overdueOrders = await this.prisma.workOrder.findMany({
         where: {
           deadline: { lt: now },
-          status: { notIn: [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED] },
+          // 仅升级已派单（ASSIGNED）/ 处理中（IN_PROGRESS）的超时工单。
+          // PENDING（未派单）超时不属于"升级"语义，应走催派单提醒而非 level 提升；
+          // 终态（COMPLETED/CANCELLED）自然排除。
+          status: { in: [WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS] },
         },
         select: { id: true, elderId: true, level: true, status: true, deadline: true },
       });
