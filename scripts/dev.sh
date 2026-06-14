@@ -283,6 +283,7 @@ main() {
     db:migrate)   cmd_db_migrate ;;
     db:seed)      cmd_db_seed ;;
     db:reset)     cmd_db_reset ;;
+    demo-seed)    log "填充演示数据（清空现有数据后重灌）..."; (cd "$API_DIR" && pnpm seed:demo); ok "演示数据已填充" ;;
     -h|--help|help) usage ;;
     *) die "未知命令：$cmd（用 --help 查看用法）" ;;
   esac

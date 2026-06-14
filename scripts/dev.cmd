@@ -47,6 +47,7 @@ if /i "%CMD%"=="logs" goto :cmd_logs
 if /i "%CMD%"=="db:migrate" goto :cmd_db_migrate
 if /i "%CMD%"=="db:seed" goto :cmd_db_seed
 if /i "%CMD%"=="db:reset" goto :cmd_db_reset
+if /i "%CMD%"=="demo-seed" goto :cmd_demo_seed
 echo [X] unknown command: %CMD% (run with 'help')
 exit /b 1
 
@@ -175,6 +176,14 @@ pushd "%API_DIR%" >nul
 call pnpm exec prisma migrate reset --force
 popd >nul
 echo [v] database reset (migrated + seeded)
+goto :done
+
+:cmd_demo_seed
+echo [^>] filling demo data (clears existing data first)...
+pushd "%API_DIR%" >nul
+call pnpm seed:demo
+popd >nul
+echo [v] demo data filled
 goto :done
 
 :cmd_bootstrap
