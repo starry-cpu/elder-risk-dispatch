@@ -45,7 +45,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
 import AppNavbar from '@/components/AppNavbar.vue';
 import AppCard from '@/components/AppCard.vue';
 import AppTag from '@/components/AppTag.vue';
@@ -85,20 +86,31 @@ function levelToTag(level: string): 'high' | 'medium' | 'low' {
   return 'low';
 }
 
+// 请求序号：快速切换老人时只保留最后一次结果，避免旧请求覆盖新结果
+let loadSeq = 0;
+
 async function loadData() {
+  const seq = ++loadSeq;
   loading.value = true;
   try {
     const res = await workOrdersApi.list({ elderId: auth.currentElderId });
+    // 仅当本次仍为最新请求时才落库（防止竞态覆盖）
+    if (seq !== loadSeq) return;
     const data = (res as any)?.data?.data;
     if (data?.items) orders.value = data.items;
   } catch {
+    if (seq !== loadSeq) return;
     uni.showToast({ title: '加载失败', icon: 'none' });
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 }
 
 onMounted(() => { loadData(); });
+// 重新进入页面（返回/切前台）时刷新：onMounted 不会在已驻栈页面重跑
+onShow(() => { loadData(); });
+// 当前老人切换时实时刷新（即便页面已驻栈）
+watch(() => auth.currentElderId, () => { loadData(); });
 </script>
 
 <style scoped>
