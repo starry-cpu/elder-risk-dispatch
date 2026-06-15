@@ -9,7 +9,9 @@ describe('AuthController', () => {
 
   const mockAuthService = {
     wechatLogin: jest.fn(),
+    wechatLoginWithCode: jest.fn(),
     adminLogin: jest.fn(),
+    workerLogin: jest.fn(),
     validateUser: jest.fn(),
   };
 
@@ -25,11 +27,13 @@ describe('AuthController', () => {
 
   describe('POST /auth/wechat-login', () => {
     it('should return token and user', async () => {
-      mockAuthService.wechatLogin.mockResolvedValue({
+      mockAuthService.wechatLoginWithCode.mockResolvedValue({
         token: 'jwt-token',
         user: { id: '1', name: 'Test', role: Role.FAMILY },
       });
       const result = await controller.wechatLogin({ code: 'test-code' });
+      // 控制器应委托给 wechatLoginWithCode（用 code 换 openid 再签发）
+      expect(mockAuthService.wechatLoginWithCode).toHaveBeenCalledWith('test-code', undefined);
       expect(result).toHaveProperty('token');
     });
   });
@@ -41,6 +45,18 @@ describe('AuthController', () => {
         user: { id: '2', name: 'Admin', role: Role.ADMIN },
       });
       const result = await controller.adminLogin({ phone: '13800138000', password: 'pass' });
+      expect(result).toHaveProperty('token');
+    });
+  });
+
+  describe('POST /auth/worker-login', () => {
+    it('should delegate to service.workerLogin and return token + user', async () => {
+      mockAuthService.workerLogin.mockResolvedValue({
+        token: 'jwt-token',
+        user: { id: '3', name: '陈秀英', role: Role.GRID_WORKER },
+      });
+      const result = await controller.workerLogin({ phone: '13901100001', password: 'worker123' });
+      expect(mockAuthService.workerLogin).toHaveBeenCalledWith({ phone: '13901100001', password: 'worker123' });
       expect(result).toHaveProperty('token');
     });
   });

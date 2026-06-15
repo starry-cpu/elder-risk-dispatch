@@ -1,28 +1,308 @@
 <template>
-  <view class="page p-4" v-if="order">
-    <view class="bg-white rounded-lg p-4 shadow-sm mb-4">
-      <view class="text-lg font-bold mb-2">{{ TYPE_LABELS[order.type] || order.type }}</view>
-      <view class="text-sm text-gray-600 space-y-1"><view>老人: {{ order.elderName || order.elderId }}</view><view>等级: {{ order.level }}</view><view>状态: {{ STATUS_LABELS[order.status] || order.status }}</view><view v-if="order.deadline">截止: {{ order.deadline }}</view></view>
+  <view class="page">
+    <AppNavbar title="工单详情" />
+
+    <view v-if="loading" class="page-state">
+      <text class="page-state__text">加载中...</text>
     </view>
-    <view class="bg-white rounded-lg p-4 shadow-sm mb-4" v-if="availableActions.length > 0">
-      <view class="text-sm font-medium mb-3">可执行操作</view>
-      <view class="flex flex-wrap gap-2"><wd-button v-for="action in availableActions" :key="action" size="small" :type="action === 'COMPLETE' ? 'primary' : 'info'" @click="handleAction(action)">{{ actionLabels[action] || action }}</wd-button></view>
-    </view>
-    <wd-message-box v-model="resultDialogVisible" title="填写处理结果"><wd-textarea v-model="resultText" :rows="3" placeholder="请描述处理结果" /><template #footer><wd-button size="small" @click="resultDialogVisible = false">取消</wd-button><wd-button size="small" type="primary" @click="submitResult">确认</wd-button></template></wd-message-box>
-    <view class="bg-white rounded-lg p-4 shadow-sm"><view class="text-sm font-medium mb-3">流转时间线</view><wd-timeline v-if="timeline.length > 0"><wd-timeline-item v-for="t in timeline" :key="t.id" :title="t.action" :content="t.note || ''" :time="t.createdAt" /></wd-timeline></view>
+
+    <template v-else-if="order">
+      <!-- 状态指示 -->
+      <view class="detail-header">
+        <view class="detail-header__status">
+          <AppStatusDot :status="statusDotType(order.status)" :size="14" />
+          <text class="detail-header__status-text">
+            {{ STATUS_LABELS[order.status] || order.status }}
+          </text>
+        </view>
+        <text class="detail-header__title">
+          {{ TYPE_LABELS[order.type] || order.type }}
+        </text>
+      </view>
+
+      <!-- 信息区 -->
+      <view class="detail-section">
+        <view class="detail-field">
+          <text class="detail-field__label">关联老人</text>
+          <text class="detail-field__value">{{ order.elderName || order.elderId }}</text>
+        </view>
+        <view class="detail-field">
+          <text class="detail-field__label">优先级</text>
+          <text class="detail-field__value">{{ order.level }}</text>
+        </view>
+        <view v-if="order.assigneeName" class="detail-field">
+          <text class="detail-field__label">负责人</text>
+          <text class="detail-field__value">{{ order.assigneeName }}</text>
+        </view>
+        <view class="detail-field">
+          <text class="detail-field__label">创建时间</text>
+          <text class="detail-field__value">{{ formatTime(order.createdAt) }}</text>
+        </view>
+        <view v-if="order.startedAt" class="detail-field">
+          <text class="detail-field__label">开始时间</text>
+          <text class="detail-field__value">{{ formatTime(order.startedAt) }}</text>
+        </view>
+      </view>
+
+      <view class="detail-divider">
+        <text class="detail-divider__text">处理记录</text>
+      </view>
+
+      <!-- 时间线（wot-design-uni 提供 wd-steps/wd-step，无 wd-timeline） -->
+      <view v-if="timeline.length > 0" class="detail-timeline">
+        <wd-steps :active="timeline.length" vertical dot>
+          <wd-step
+            v-for="t in timeline"
+            :key="t.id"
+            :title="t.action"
+            :description="(t.note ? t.note + '　' : '') + formatTime(t.createdAt)"
+          />
+        </wd-steps>
+      </view>
+
+      <!-- 操作按钮区（固定底部） -->
+      <view v-if="availableActions.length > 0" class="detail-footer">
+        <AppButton
+          v-for="action in availableActions"
+          :key="action"
+          :type="action === 'START' ? 'primary' : 'primary'"
+          size="full"
+          @click="handleAction(action)"
+        >
+          {{ action === 'START' ? '开始处理' : action === 'COMPLETE' ? '完成处理' : action }}
+        </AppButton>
+        <AppButton
+          v-if="showCancel"
+          type="text"
+          size="full"
+          @click="handleCancel"
+        >
+          取消工单
+        </AppButton>
+      </view>
+    </template>
+
+    <!-- 完成弹窗：wd-message-box 是命令式组件，由 useMessage(selector) 控制；
+         v-model/title/footer slot 都不是有效 prop，原写法导致弹窗永远打不开 -->
+    <wd-message-box selector="complete-result">
+      <textarea
+        v-model="resultText"
+        style="width: 100%; min-height: 160rpx; font-size: 28rpx; padding: 12rpx 0;"
+        placeholder="请描述处理结果..."
+      />
+    </wd-message-box>
   </view>
 </template>
+
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useMessage } from 'wot-design-uni';
+import AppNavbar from '@/components/AppNavbar.vue';
+import AppStatusDot from '@/components/AppStatusDot.vue';
+import AppButton from '@/components/AppButton.vue';
+import { workOrdersApi } from '@/api/work-orders';
 import { useWorkOrderFlow } from '@/composables/useWorkOrderFlow';
 import { TYPE_LABELS, STATUS_LABELS } from '@/composables/useOrderProgress';
+import { formatTime } from '@/utils/format';
+
 const { getAvailableActions, validateCompletion } = useWorkOrderFlow();
-const order = ref<any>(null); const timeline = ref<any[]>([]); const resultText = ref(''); const resultDialogVisible = ref(false);
-const availableActions = computed(() => order.value ? getAvailableActions(order.value.status) : []);
-const actionLabels: Record<string, string> = { START: '开始处理', COMPLETE: '完成' };
-const actionRoute: Record<string, string> = { START: 'start', COMPLETE: 'complete' };
-function loadDetail() { const pages = getCurrentPages(); const id = (pages[pages.length - 1] as any)?.options?.id; if (!id) return; const token = uni.getStorageSync('token'); uni.request({ url: `/api/v1/work-orders/${id}`, header: { Authorization: `Bearer ${token}` }, success: (res: any) => { if (res.data?.data) order.value = res.data.data; } }); uni.request({ url: `/api/v1/work-orders/${id}/timeline`, header: { Authorization: `Bearer ${token}` }, success: (res: any) => { if (res.data?.data) timeline.value = res.data.data; } }); }
-function handleAction(action: string) { if (action === 'COMPLETE') { resultDialogVisible.value = true; return; } if (!order.value) return; const route = actionRoute[action]; if (!route) { uni.showToast({ title: `不支持的操作: ${action}`, icon: 'none' }); return; } uni.request({ url: `/api/v1/work-orders/${order.value.id}/${route}`, method: 'POST', header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '操作成功' }); loadDetail(); } }); }
-function submitResult() { if (!order.value) return; const validation = validateCompletion(resultText.value); if (!validation.valid) { uni.showToast({ title: validation.message || '请填写处理结果', icon: 'none' }); return; } uni.request({ url: `/api/v1/work-orders/${order.value.id}/complete`, method: 'POST', data: { result: resultText.value }, header: { Authorization: `Bearer ${uni.getStorageSync('token')}` }, success: () => { uni.showToast({ title: '已完成' }); resultDialogVisible.value = false; loadDetail(); } }); }
+
+// wd-message-box 通过 useMessage(selector) 命令式驱动（selector 用于多实例隔离）
+const message = useMessage('complete-result');
+
+const order = ref<any>(null);
+const timeline = ref<any[]>([]);
+const resultText = ref('');
+const loading = ref(false);
+
+const availableActions = computed(() =>
+  order.value ? getAvailableActions(order.value.status) : []
+);
+
+const showCancel = computed(() =>
+  order.value?.status === 'ASSIGNED' || order.value?.status === 'IN_PROGRESS'
+);
+
+function statusDotType(status: string): string {
+  if (status === 'ASSIGNED') return 'warning';
+  if (status === 'IN_PROGRESS') return 'info';
+  if (status === 'COMPLETED') return 'success';
+  return 'info';
+}
+
+async function loadDetail() {
+  const pages = getCurrentPages();
+  const current = pages[pages.length - 1] as any;
+  const id = current?.options?.id;
+  if (!id) {
+    uni.showToast({ title: '参数错误', icon: 'none' });
+    return;
+  }
+  loading.value = true;
+  try {
+    const [detailRes, timelineRes] = await Promise.all([
+      workOrdersApi.getById(id),
+      workOrdersApi.getTimeline(id),
+    ]);
+    const detailData = (detailRes as any)?.data?.data;
+    if (detailData) order.value = detailData;
+    const timelineData = (timelineRes as any)?.data?.data;
+    if (timelineData) timeline.value = Array.isArray(timelineData) ? timelineData : [];
+  } catch {
+    uni.showToast({ title: '加载失败', icon: 'none' });
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function handleAction(action: string) {
+  if (action === 'COMPLETE') {
+    if (!order.value) return;
+    // 每次打开重置输入，避免上一次的残留
+    resultText.value = '';
+    // message.confirm：确认 resolve、取消/蒙层 reject。
+    // 用 beforeConfirm 做本地校验——校验不过时 resolve(false) 阻止弹窗关闭。
+    try {
+      await message.confirm({
+        title: '填写处理结果',
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        beforeConfirm: ({ resolve }) => {
+          const validation = validateCompletion(resultText.value);
+          if (!validation.valid) {
+            uni.showToast({ title: validation.message || '请填写处理结果', icon: 'none' });
+            resolve(false);
+            return;
+          }
+          resolve(true);
+        },
+      });
+    } catch {
+      // 用户取消，不做任何提交
+      return;
+    }
+    // 走到这里说明 beforeConfirm 通过且用户点了确认
+    await completeOrder();
+    return;
+  }
+  if (!order.value) return;
+  try {
+    if (action === 'START') {
+      await workOrdersApi.start(order.value.id);
+    } else {
+      uni.showToast({ title: `不支持的操作: ${action}`, icon: 'none' });
+      return;
+    }
+    uni.showToast({ title: '操作成功' });
+    loadDetail();
+  } catch {
+    // client interceptor already shows toast
+  }
+}
+
+async function completeOrder() {
+  if (!order.value) return;
+  try {
+    await workOrdersApi.complete(order.value.id, { result: resultText.value });
+    uni.showToast({ title: '已完成' });
+    loadDetail();
+  } catch {
+    // client interceptor already shows toast
+  }
+}
+
+async function handleCancel() {
+  if (!order.value) return;
+  try {
+    await workOrdersApi.cancel(order.value.id);
+    uni.showToast({ title: '已取消' });
+    loadDetail();
+  } catch {
+    // client interceptor already shows toast
+  }
+}
+
 onMounted(() => { loadDetail(); });
 </script>
+
+<style scoped>
+.page {
+  min-height: 100vh;
+  background-color: #F7F3ED;
+  padding-bottom: 160rpx;
+}
+.detail-header {
+  padding: 32rpx 20rpx 0;
+}
+.detail-header__status {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
+}
+.detail-header__status-text {
+  font-size: 28rpx;
+  color: #6B6760;
+}
+.detail-header__title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #2C2B29;
+}
+.detail-section {
+  margin: 24rpx 20rpx;
+  padding: 0;
+}
+.detail-field {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 14rpx 0;
+}
+.detail-field + .detail-field {
+  border-top: 1rpx solid #F0ECE5;
+}
+.detail-field__label {
+  width: 160rpx;
+  flex-shrink: 0;
+  font-size: 28rpx;
+  color: #9E9990;
+}
+.detail-field__value {
+  flex: 1;
+  font-size: 28rpx;
+  color: #2C2B29;
+}
+.detail-divider {
+  padding: 0 20rpx;
+  margin: 16rpx 0;
+}
+.detail-divider__text {
+  font-size: 22rpx;
+  color: #9E9990;
+}
+.detail-timeline {
+  margin: 0 20rpx;
+}
+.detail-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20rpx 20rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background-color: #F7F3ED;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.page-state {
+  display: flex;
+  justify-content: center;
+  padding: 80rpx 0;
+}
+.page-state__text {
+  font-size: 28rpx;
+  color: #9E9990;
+}
+</style>

@@ -5,7 +5,7 @@ import { VisitsService } from './visits.service';
 import { CreateVisitDto } from './dto/create-visit.dto';
 import { QueryVisitDto } from './dto/query-visit.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Visits')
 @ApiBearerAuth()
@@ -16,14 +16,14 @@ export class VisitsController {
   @Post()
   @Roles(Role.GRID_WORKER)
   @ApiOperation({ summary: '提交巡访记录（含定位、照片）' })
-  create(@Body() dto: CreateVisitDto, @CurrentUser() user: any) {
+  create(@Body() dto: CreateVisitDto, @CurrentUser() user: AuthenticatedUser) {
     return this.visitsService.create(dto, user);
   }
 
   @Get()
   @Roles(Role.GRID_WORKER, Role.ADMIN)
   @ApiOperation({ summary: '查询巡访记录（按老人/时间范围筛选）' })
-  findAll(@Query() query: QueryVisitDto, @CurrentUser() user: any) {
+  findAll(@Query() query: QueryVisitDto, @CurrentUser() user: AuthenticatedUser) {
     const { page = 1, limit = 20, ...rest } = query;
     return this.visitsService.findAll({ page, limit, ...rest }, user);
   }

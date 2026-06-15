@@ -2,7 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RulesController } from './rules.controller';
 import { RulesService } from './rules.service';
-import { RiskLevel } from '@prisma/client';
+import { RiskLevel, Role } from '@prisma/client';
 
 describe('RulesController', () => {
   let controller: RulesController;
@@ -28,7 +28,7 @@ describe('RulesController', () => {
 
   it('create 应创建新规则', async () => {
     mockRulesService.create.mockResolvedValue({ id: 'r1', name: '新规则', version: 1 });
-    const result = await controller.create({ name: '新规则', condition: {}, weight: 10, level: RiskLevel.LOW }, { sub: 'u1' });
+    const result = await controller.create({ name: '新规则', condition: {}, weight: 10, level: RiskLevel.LOW }, { sub: 'u1', role: Role.ADMIN, loginType: 'admin' });
     expect(result.version).toBe(1);
   });
 

@@ -8,7 +8,7 @@
     <el-table-column label="姓名" prop="name" min-width="80" />
     <el-table-column label="性别" width="60" prop="gender">
       <template #default="{ row }">
-        {{ row.gender === 'M' ? '男' : '女' }}
+        {{ genderLabel(row.gender) }}
       </template>
     </el-table-column>
     <el-table-column label="年龄" width="60">
@@ -78,6 +78,7 @@
 <script setup lang="ts">
 import dayjs from 'dayjs';
 import type { ElderRecord } from '@/api/elders';
+import { genderLabel } from '@/utils/elders';
 
 defineProps<{
   items: ElderRecord[];

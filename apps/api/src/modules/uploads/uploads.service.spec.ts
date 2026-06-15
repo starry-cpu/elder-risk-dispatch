@@ -1,9 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UploadsService } from './uploads.service';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3Client } from '@aws-sdk/client-s3';
+import { v4 as uuidv4 } from 'uuid';
 
 jest.mock('@aws-sdk/client-s3');
 jest.mock('@aws-sdk/s3-request-presigner');
+// uuid 在 saveAudioFile 测试里需返回确定值，避免 auto-mock 的 'mock-uuid' 破坏 key 正则断言
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
+}));
 
 describe('UploadsService', () => {
   let service: UploadsService;
@@ -48,8 +54,9 @@ describe('UploadsService', () => {
   describe('getAllowedTypesForFolder', () => {
     it('should return audio types for checkins folder', () => {
       const types = service.getAllowedTypesForFolder('checkins');
-      expect(types).toHaveLength(3);
+      expect(types).toHaveLength(4);
       expect(types).toContain('audio/mp3');
+      expect(types).toContain('audio/mpeg');
       expect(types).toContain('audio/wav');
       expect(types).toContain('audio/m4a');
     });
@@ -109,6 +116,44 @@ describe('UploadsService', () => {
       (getSignedUrl as jest.Mock).mockResolvedValue('https://minio.example.com/care/visits/uuid-photo.jpg?signature=yyy');
       const result = await service.generatePresignedUrl('photo.jpg', 'image/jpeg', 'visits');
       expect(result.key).toContain('visits/');
+    });
+  });
+
+  describe('saveAudioFile', () => {
+    const OLD_ENV = process.env;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      process.env = {
+        ...OLD_ENV,
+        S3_ENDPOINT: 'http://localhost:9000',
+        S3_ACCESS_KEY: 'minioadmin',
+        S3_SECRET_KEY: 'minioadmin',
+        S3_BUCKET: 'care',
+        S3_REGION: 'us-east-1',
+      };
+    });
+
+    afterAll(() => {
+      process.env = OLD_ENV;
+    });
+
+    it('should upload audio buffer to MinIO and return { url, key }', async () => {
+      const buffer = Buffer.from('fake-audio');
+      const result = await service.saveAudioFile(buffer, 'audio/mpeg', 'test.mp3');
+
+      expect(result.key).toMatch(/^checkins\/[a-f0-9-]+\.mp3$/);
+      expect(result.url).toContain(result.key);
+      expect(result.url).toContain('9000'); // MinIO endpoint 端口
+      // 验证确实触发了 S3 直传（PutObjectCommand 走 s3Client.send）
+      expect(S3Client.prototype.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw BadRequestException for unsupported audio type', async () => {
+      const buffer = Buffer.from('fake');
+      await expect(service.saveAudioFile(buffer, 'video/mp4', 'test.mp4')).rejects.toThrow(
+        '不支持的音频类型',
+      );
     });
   });
 });

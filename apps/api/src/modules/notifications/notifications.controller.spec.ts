@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { Role } from '@prisma/client';
 
 describe('NotificationsController', () => {
   let controller: NotificationsController;
@@ -40,13 +41,19 @@ describe('NotificationsController', () => {
   });
 
   describe('GET /notifications', () => {
-    it('should call service.findAll with query params', async () => {
+    it('should call service.findAll with query params and requester', async () => {
       mockService.findAll.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
+      const admin = { sub: 'admin-1', role: Role.ADMIN, district: '朝阳区', loginType: 'admin' as const };
 
-      const result = await controller.findAll({ page: 1, limit: 20 });
+      const result = await controller.findAll({ page: 1, limit: 20 }, admin);
 
       expect(result.items).toEqual([]);
       expect(result.total).toBe(0);
+      // requester 一并透传给 service 做鉴权
+      expect(mockService.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, limit: 20 }),
+        admin,
+      );
     });
   });
 });

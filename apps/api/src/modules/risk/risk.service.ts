@@ -23,6 +23,27 @@ export class RiskService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  /**
+   * 鉴权：HTTP 入口（POST /risk/evaluate）调用前先校验调用者对该老人有权限。
+   * 仅做片区隔离——FAMILY 不允许手动评估，ADMIN 放行，worker 须同片区。
+   *
+   * 注意：evaluateAndCreateEvent 本身保持 requester-agnostic，因为调度器
+   * (SchedulerService.scanMissedCheckIns) 会以系统身份循环调用它，那里没有
+   * requester 概念。鉴权责任放在 controller，通过本方法显式执行。
+   */
+  async assertCanEvaluate(elderId: string, requester: Requester): Promise<void> {
+    const elder = await this.prisma.elder.findUnique({
+      where: { id: elderId },
+      select: { district: true },
+    });
+    if (!elder) throw new NotFoundException('老人不存在');
+    if (requester.role === Role.ADMIN) return;
+    // 非 ADMIN worker 必须有片区且与老人同片区；district 缺失同样拒绝
+    if (!requester.district || elder.district !== requester.district) {
+      throw new NotFoundException('老人不存在');
+    }
+  }
+
   async evaluateAndCreateEvent(input: {
     elderId: string;
     hoursSinceLastCheckIn?: number;
@@ -138,7 +159,7 @@ export class RiskService {
       where.elder = { district };
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.riskEvent.findMany({
         where,
         include: { elder: { select: { id: true, name: true, district: true } } },
@@ -149,6 +170,13 @@ export class RiskService {
       this.prisma.riskEvent.count({ where }),
     ]);
 
+    // 拍平嵌套关系为扁平字段（前端模板读 elderName/elderId）
+    const items = rows.map((ev: any) => ({
+      ...ev,
+      elderId: ev.elder?.id ?? ev.elderId,
+      elderName: ev.elder?.name ?? null,
+    }));
+
     return { items, total, page, limit };
   }
 
@@ -156,18 +184,39 @@ export class RiskService {
     const event = await this.prisma.riskEvent.findUnique({
       where: { id },
       include: {
-        elder: true,
-        workOrder: true,
+        // 仅取老人安全字段，避免把加密的 idCard/address 等敏感列直接外泄；
+        // 同时带 familyLinks 以便校验 FAMILY 归属。
+        elder: {
+          select: {
+            id: true,
+            name: true,
+            gender: true,
+            district: true,
+            serviceLevel: true,
+            familyLinks: { select: { userId: true } },
+          },
+        },
+        workOrder: { select: { id: true, status: true, type: true, level: true } },
       },
     });
     if (!event) throw new NotFoundException('风险事件不存在');
 
-    // District isolation: non-ADMIN limited to own district
-    if (requester && requester.role !== Role.ADMIN && requester.district && event.elder.district !== requester.district) {
-      throw new NotFoundException('风险事件不存在');
+    if (requester && requester.role !== Role.ADMIN) {
+      if (requester.role === Role.FAMILY) {
+        // FAMILY 只能看自己关联老人员的风险事件（避免跨家属越权 + PII 泄露）
+        const linked = event.elder.familyLinks?.some((fl: any) => fl.userId === requester.sub);
+        if (!linked) throw new NotFoundException('风险事件不存在');
+      } else {
+        // worker 维持片区隔离；district 缺失同样拒绝
+        if (!requester.district || event.elder.district !== requester.district) {
+          throw new NotFoundException('风险事件不存在');
+        }
+      }
     }
 
-    return event;
+    // familyLinks 仅用于鉴权，不外泄（前缀 _ 标记为有意剥离）
+    const { familyLinks: _familyLinks, ...safeElder } = event.elder as any;
+    return { ...event, elder: safeElder };
   }
 
   async reviewEvent(

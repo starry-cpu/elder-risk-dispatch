@@ -14,7 +14,17 @@
     "format": "prettier --write \"**/*.{ts,js,json,mjs,cjs,md,vue}\"",
     "format:check": "prettier --check \"**/*.{ts,js,json,mjs,cjs,md,vue}\"",
     "generate:types": "pnpm --filter @care/shared-types generate",
-    "prepare": "husky"
+    "prepare": "husky",
+
+    "start": "bash scripts/dev.sh",
+    "start:bootstrap": "bash scripts/dev.sh bootstrap",
+    "infra:up": "bash scripts/dev.sh up",
+    "infra:down": "bash scripts/dev.sh down",
+    "infra:reset": "bash scripts/dev.sh reset",
+    "db:migrate": "bash scripts/dev.sh db:migrate",
+    "db:seed": "bash scripts/dev.sh db:seed",
+    "db:reset": "bash scripts/dev.sh db:reset",
+    "stop": "bash scripts/dev.sh stop"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",

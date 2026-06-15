@@ -93,6 +93,15 @@ export class EldersService {
     };
   }
 
+  // 查询当前家属关联的老人列表（咽喉接口：供小程序前端在登录后取回 elderId）
+  async findMine(requester: Requester) {
+    const links = await this.prisma.elderFamilyLink.findMany({
+      where: { userId: requester.sub },
+      include: { elder: { select: { id: true, name: true, serviceLevel: true, district: true } } },
+    });
+    return { items: links.map((l: any) => l.elder) };
+  }
+
   async findById(id: string, requester: Requester) {
     const elder = await this.prisma.elder.findUnique({
       where: { id },

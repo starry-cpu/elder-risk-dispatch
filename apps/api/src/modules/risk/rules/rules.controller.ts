@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { RulesService } from './rules.service';
 import { Roles } from '../../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 
 @ApiTags('Risk Rules')
 @ApiBearerAuth()
@@ -31,7 +31,7 @@ export class RulesController {
 
   @Post('risk/rules')
   @ApiOperation({ summary: '创建风险规则' })
-  create(@Body() body: any, @CurrentUser() user: any) {
+  create(@Body() body: any, @CurrentUser() user: AuthenticatedUser) {
     return this.rulesService.create(body, user.sub);
   }
 

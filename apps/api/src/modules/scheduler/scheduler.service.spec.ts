@@ -17,7 +17,7 @@ describe('SchedulerService', () => {
 
   const mockRiskService = { evaluateAndCreateEvent: jest.fn() };
   const mockWorkOrdersService = { escalate: jest.fn() };
-  const mockNotificationsService = { send: jest.fn() };
+  const mockNotificationsService = { send: jest.fn(), sendToRecipients: jest.fn().mockResolvedValue({ recipients: [], notifications: [] }) };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -125,12 +125,30 @@ describe('SchedulerService', () => {
       expect(mockPrisma.workOrder.findMany).toHaveBeenCalledWith({
         where: {
           deadline: { lt: expect.any(Date) },
-          status: { notIn: [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED] },
+          // 仅已派单/处理中的超时工单；PENDING（未派单）不被升级
+          status: { in: [WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS] },
         },
         select: { id: true, elderId: true, level: true, status: true, deadline: true },
       });
       expect(mockWorkOrdersService.escalate).toHaveBeenCalledTimes(2);
       expect(result.escalated).toBe(2);
+    });
+
+    it('PENDING 工单即便超时也不应被升级（仅 ASSIGNED/IN_PROGRESS 升级）', async () => {
+      // 调度器查询已用 status:{in:[ASSIGNED,IN_PROGRESS]} 过滤，
+      // 这里以空结果模拟"PENDING 工单根本不会进入升级循环"，
+      // 并断言查询条件确实排除了 PENDING。
+      mockPrisma.workOrder.findMany.mockResolvedValue([]);
+      mockPrisma.schedulerRun.create.mockResolvedValue({ id: 'run-3' });
+      mockPrisma.schedulerRun.update.mockResolvedValue({});
+
+      const result = await service.escalateTimeouts();
+
+      const call = mockPrisma.workOrder.findMany.mock.calls[0][0];
+      expect(call.where.status.in).toEqual([WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS]);
+      expect(call.where.status.in).not.toContain(WorkOrderStatus.PENDING);
+      expect(mockWorkOrdersService.escalate).not.toHaveBeenCalled();
+      expect(result.escalated).toBe(0);
     });
 
     it('should return zero when no orders are overdue', async () => {

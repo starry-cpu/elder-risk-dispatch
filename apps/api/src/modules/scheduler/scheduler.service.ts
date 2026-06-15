@@ -51,9 +51,8 @@ export class SchedulerService {
             eventsCreated++;
             if (event.level !== 'LOW') {
               try {
-                await this.notificationsService.send({
-                  targetType: 'USER',
-                  targetId: 'system',
+                await this.notificationsService.sendToRecipients({
+                  elderId: elder.id,
                   templateId: process.env.WECHAT_TEMPLATE_MISSED_CHECKIN,
                   payload: {
                     thing1: { value: elder.name },
@@ -103,7 +102,10 @@ export class SchedulerService {
       const overdueOrders = await this.prisma.workOrder.findMany({
         where: {
           deadline: { lt: now },
-          status: { notIn: [WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED] },
+          // 仅升级已派单（ASSIGNED）/ 处理中（IN_PROGRESS）的超时工单。
+          // PENDING（未派单）超时不属于"升级"语义，应走催派单提醒而非 level 提升；
+          // 终态（COMPLETED/CANCELLED）自然排除。
+          status: { in: [WorkOrderStatus.ASSIGNED, WorkOrderStatus.IN_PROGRESS] },
         },
         select: { id: true, elderId: true, level: true, status: true, deadline: true },
       });
@@ -119,16 +121,15 @@ export class SchedulerService {
             escalated++;
 
             try {
-              await this.notificationsService.send({
-                targetType: 'USER',
-                targetId: 'system',
+              await this.notificationsService.sendToRecipients({
+                elderId: wo.elderId,
                 templateId: process.env.WECHAT_TEMPLATE_ESCALATION,
                 payload: {
                   thing1: { value: wo.id },
                   thing2: { value: `工单超时自动升级: ${oldLevel} → ${updated.level}` },
                 },
               });
-            } catch (notifError: any) {
+            } catch (_notifError: any) {
               this.logger.warn(`Failed to enqueue escalation notification for wo ${wo.id}`);
             }
           }

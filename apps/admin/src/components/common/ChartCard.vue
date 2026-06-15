@@ -1,10 +1,12 @@
 <template>
-  <el-card shadow="hover" class="h-full">
-    <template #header>
-      <span class="font-medium">{{ title }}</span>
-    </template>
-    <div ref="chartRef" :style="{ height: chartHeight }" />
-  </el-card>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3 class="chart-title">{{ title }}</h3>
+    </div>
+    <div class="chart-body">
+      <div ref="chartRef" :style="{ height: chartHeight }" />
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -45,3 +47,35 @@ watch(() => props.option, (newOpt) => {
   instance?.setOption(newOpt);
 }, { deep: true });
 </script>
+
+<style scoped>
+.chart-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.chart-card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.chart-header {
+  padding: 16px 24px 0;
+}
+
+.chart-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: 0.03em;
+}
+
+.chart-body {
+  padding: 8px 8px 16px;
+}
+</style>

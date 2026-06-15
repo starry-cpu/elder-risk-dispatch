@@ -1,10 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { FieldEncryptionService } from '../../common/crypto/field-encryption.service';
 import { Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+
+// Mock global fetch（复刻 wechat.channel.spec.ts 的写法）
+const mockFetch = jest.fn();
+(global as any).fetch = mockFetch;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -127,6 +132,113 @@ describe('AuthService', () => {
     });
   });
 
+  describe('workerLogin', () => {
+    it('should return token and worker user for valid credentials', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'worker-1',
+        phoneHash,
+        phone: 'encrypted-phone',
+        name: '陈秀英',
+        role: Role.GRID_WORKER,
+        passwordHash: hash,
+        district: '朝阳',
+        skills: ['LIFE', 'HEALTH'],
+        dutyStatus: 'ON_DUTY',
+        createdAt: new Date(),
+      });
+
+      const result = await service.workerLogin({ phone: '13901100001', password: 'worker123' });
+      expect(mockCrypto.hashPhone).toHaveBeenCalledWith('13901100001');
+      expect(result).toHaveProperty('token');
+      expect(result.user.role).toBe(Role.GRID_WORKER);
+    });
+
+    it('should allow COMMUNITY_DOCTOR / PROPERTY / VOLUNTEER roles', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      for (const role of [Role.COMMUNITY_DOCTOR, Role.PROPERTY, Role.VOLUNTEER]) {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'worker-x',
+          phoneHash,
+          name: '员工',
+          role,
+          passwordHash: hash,
+        });
+        const result = await service.workerLogin({ phone: '13901100009', password: 'worker123' });
+        expect(result.user.role).toBe(role);
+      }
+    });
+
+    it('should throw for invalid password', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'worker-1',
+        phoneHash,
+        name: '陈秀英',
+        role: Role.GRID_WORKER,
+        passwordHash: hash,
+      });
+      await expect(
+        service.workerLogin({ phone: '13901100001', password: 'wrong' }),
+      ).rejects.toThrow();
+    });
+
+    it('should throw when user not found', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      await expect(
+        service.workerLogin({ phone: '13900000000', password: 'worker123' }),
+      ).rejects.toThrow();
+    });
+
+    it('should reject FAMILY role (must use wechat)', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'family-1',
+        phoneHash,
+        name: '家属',
+        role: Role.FAMILY,
+        passwordHash: hash,
+      });
+      await expect(
+        service.workerLogin({ phone: '13900139000', password: 'worker123' }),
+      ).rejects.toThrow();
+    });
+
+    it('should reject ADMIN role (must use admin-login)', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'admin-1',
+        phoneHash,
+        name: '管理员',
+        role: Role.ADMIN,
+        passwordHash: hash,
+      });
+      await expect(
+        service.workerLogin({ phone: '13800138000', password: 'worker123' }),
+      ).rejects.toThrow();
+    });
+
+    it('should NOT expose passwordHash / openid in sanitized response', async () => {
+      const hash = await bcrypt.hash('worker123', 10);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'worker-1',
+        phoneHash,
+        phone: 'encrypted-phone',
+        openid: 'secret-openid-should-not-leak',
+        name: '陈秀英',
+        role: Role.GRID_WORKER,
+        passwordHash: hash,
+        district: '朝阳',
+        skills: [],
+        dutyStatus: 'ON_DUTY',
+        createdAt: new Date(),
+      });
+      const result = await service.workerLogin({ phone: '13901100001', password: 'worker123' });
+      expect(result.user).not.toHaveProperty('passwordHash');
+      expect(result.user).not.toHaveProperty('openid');
+    });
+  });
+
   describe('wechatLogin', () => {
     it('should return token for wechat user', async () => {
       mockPrisma.user.upsert.mockResolvedValue({
@@ -184,6 +296,76 @@ describe('AuthService', () => {
     it('should throw when user not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       await expect(service.validateUser('non-existent')).rejects.toThrow();
+    });
+  });
+
+  describe('wechatLoginWithCode', () => {
+    beforeEach(() => {
+      mockFetch.mockReset();
+    });
+
+    afterEach(() => {
+      delete process.env.WECHAT_APPID;
+      delete process.env.WECHAT_SECRET;
+    });
+
+    it('should exchange code for openid and return token + user', async () => {
+      process.env.WECHAT_APPID = 'wx-test-appid';
+      process.env.WECHAT_SECRET = 'test-secret';
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ openid: 'openid-from-wechat' }),
+      });
+      mockPrisma.user.upsert.mockResolvedValue({
+        id: 'user-5',
+        openid: 'openid-from-wechat',
+        name: '微信用户',
+        role: Role.FAMILY,
+        district: null,
+        phone: null,
+        skills: [],
+        dutyStatus: 'OFF_DUTY',
+        createdAt: new Date(),
+      });
+
+      const result = await service.wechatLoginWithCode('wx-login-code', undefined);
+
+      // 应调用 jscode2session 且带上 code
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('js_code=wx-login-code'),
+      );
+      // upsert 用换来的 openid，而非原始 code
+      expect(mockPrisma.user.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { openid: 'openid-from-wechat' } }),
+      );
+      expect(result).toHaveProperty('token');
+      expect(result.user.role).toBe(Role.FAMILY);
+      expect(result.user).not.toHaveProperty('openid');
+    });
+
+    it('should throw UnauthorizedException when WECHAT_APPID/SECRET not configured', async () => {
+      // 不设置凭据（afterEach 也会清理）
+      await expect(service.wechatLoginWithCode('any-code')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      // 凭据缺失时不应发起外部请求
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should throw with WeChat errmsg when jscode2session returns errcode', async () => {
+      process.env.WECHAT_APPID = 'wx-test-appid';
+      process.env.WECHAT_SECRET = 'test-secret';
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({ errcode: 40029, errmsg: 'invalid code' }),
+      });
+
+      await expect(service.wechatLoginWithCode('bad-code')).rejects.toThrow(
+        /invalid code/,
+      );
     });
   });
 });

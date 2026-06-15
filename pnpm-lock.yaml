@@ -144,6 +144,9 @@ importers:
       '@socket.io/redis-adapter':
         specifier: ^8.3.0
         version: 8.3.0(socket.io-adapter@2.5.7)
+      '@types/multer':
+        specifier: ^2.1.0
+        version: 2.1.0
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -156,6 +159,9 @@ importers:
       class-validator:
         specifier: ^0.14.0
         version: 0.14.4
+      multer:
+        specifier: ^2.1.1
+        version: 2.1.1
       nestjs-pino:
         specifier: ^4.0.0
         version: 4.6.1(@nestjs/common@11.1.26(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@11.0.0)(pino@9.14.0)(rxjs@7.8.2)
@@ -257,6 +263,9 @@ importers:
       '@dcloudio/uni-cli-shared':
         specifier: 3.0.0-alpha-5010320260611001
         version: 3.0.0-alpha-5010320260611001(@vueuse/core@14.3.0(vue@3.5.38(typescript@5.9.3)))(postcss@8.5.15)(rollup@4.61.1)(ts-node@10.9.2(@types/node@25.9.2)(typescript@5.9.3))(vue@3.5.38(typescript@5.9.3))
+      '@dcloudio/uni-h5':
+        specifier: 3.0.0-alpha-5010320260611001
+        version: 3.0.0-alpha-5010320260611001(@vueuse/core@14.3.0(vue@3.5.38(typescript@5.9.3)))(postcss@8.5.15)(rollup@4.61.1)(ts-node@10.9.2(@types/node@25.9.2)(typescript@5.9.3))(vite@6.4.3(@types/node@25.9.2)(jiti@2.6.1)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.38(typescript@5.9.3))
       '@dcloudio/uni-mp-weixin':
         specifier: 3.0.0-alpha-5010320260611001
         version: 3.0.0-alpha-5010320260611001(@vueuse/core@14.3.0(vue@3.5.38(typescript@5.9.3)))(postcss@8.5.15)(rollup@4.61.1)(ts-node@10.9.2(@types/node@25.9.2)(typescript@5.9.3))(vue@3.5.38(typescript@5.9.3))
@@ -3064,6 +3073,9 @@ packages:
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
+
+  '@types/multer@2.1.0':
+    resolution: {integrity: sha512-zYZb0+nJhOHtPpGDb3vqPjwpdeGlGC157VpkqNQL+UU2qwoacoQ7MpsAmUptI/0Oa127X32JzWDqQVEXp2RcIA==}
 
   '@types/node-fetch@2.6.13':
     resolution: {integrity: sha512-QGpRVpzSaUs30JBSGPjOg4Uveu384erbHBoT1zeONvyCfwQxIkUshLAOqN/k9EjGviPRmWTTe6aH2qySWKTVSw==}
@@ -11065,6 +11077,10 @@ snapshots:
   '@types/methods@1.1.4': {}
 
   '@types/ms@2.1.0': {}
+
+  '@types/multer@2.1.0':
+    dependencies:
+      '@types/express': 5.0.6
 
   '@types/node-fetch@2.6.13':
     dependencies:

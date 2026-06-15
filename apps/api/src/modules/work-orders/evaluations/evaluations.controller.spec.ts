@@ -25,7 +25,7 @@ describe('EvaluationsController', () => {
       mockService.create.mockResolvedValue({ id: 'ev-1', rating: 5 });
       const result = await controller.create('wo-1',
         { rating: 5, comment: '好' },
-        { sub: 'u1', role: Role.ADMIN },
+        { sub: 'u1', role: Role.ADMIN, loginType: 'admin' },
       );
       expect(result!.rating).toBe(5);
     });
@@ -34,7 +34,7 @@ describe('EvaluationsController', () => {
   describe('findByWorkOrderId', () => {
     it('应返回评价', async () => {
       mockService.findByWorkOrderId.mockResolvedValue({ id: 'ev-1', rating: 5 });
-      const result = await controller.findByWorkOrderId('wo-1', { sub: 'u1', role: Role.ADMIN });
+      const result = await controller.findByWorkOrderId('wo-1', { sub: 'u1', role: Role.ADMIN, loginType: 'admin' });
       expect(result!.rating).toBe(5);
     });
   });

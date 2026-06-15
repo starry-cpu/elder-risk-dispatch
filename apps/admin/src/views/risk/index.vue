@@ -35,7 +35,12 @@ const dialogVisible = ref(false);
 const selectedEvent = ref<RiskEventRecord | null>(null);
 const reviewAction = ref<'confirm' | 'ignore'>('confirm');
 
-function load() { store.fetchList({ page: page.value, limit: limit.value, ...filters }); }
+function load() {
+  const params: { page: number; limit: number; level?: string; status?: string } = { page: page.value, limit: limit.value };
+  if (filters.level) params.level = filters.level;
+  if (filters.status) params.status = filters.status;
+  store.fetchList(params);
+}
 function openReview(event: RiskEventRecord, action: 'confirm' | 'ignore') { selectedEvent.value = event; reviewAction.value = action; dialogVisible.value = true; }
 async function handleReviewSubmit(status: string, note?: string) {
   if (!selectedEvent.value) return;

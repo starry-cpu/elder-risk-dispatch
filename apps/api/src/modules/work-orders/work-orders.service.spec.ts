@@ -27,6 +27,7 @@ describe('WorkOrdersService', () => {
     workOrderTimeline: { create: jest.fn(), findMany: jest.fn() },
     riskEvent: { findUnique: jest.fn(), update: jest.fn() },
     user: { findUnique: jest.fn(), update: jest.fn() },
+    elderFamilyLink: { findMany: jest.fn() },
   };
 
   const mockDispatch = {
@@ -153,6 +154,53 @@ describe('WorkOrdersService', () => {
           where: { elder: { district: '东区' } },
         }),
       );
+    });
+
+    it('should filter by family-linked elders for FAMILY role', async () => {
+      const familyUser = { sub: 'family-1', role: Role.FAMILY, district: undefined };
+      mockPrisma.elderFamilyLink.findMany.mockResolvedValue([
+        { elderId: 'e-1' },
+        { elderId: 'e-2' },
+      ]);
+      mockPrisma.workOrder.findMany.mockResolvedValue([]);
+      mockPrisma.workOrder.count.mockResolvedValue(0);
+
+      await service.findAll({ page: 1, limit: 20 }, familyUser as any);
+
+      expect(mockPrisma.elderFamilyLink.findMany).toHaveBeenCalledWith({
+        where: { userId: 'family-1' },
+        select: { elderId: true },
+      });
+      expect(mockPrisma.workOrder.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ elderId: { in: ['e-1', 'e-2'] } }),
+        }),
+      );
+    });
+
+    it('should return empty result when FAMILY has no family links', async () => {
+      const familyUser = { sub: 'family-1', role: Role.FAMILY, district: undefined };
+      mockPrisma.elderFamilyLink.findMany.mockResolvedValue([]);
+      mockPrisma.workOrder.findMany.mockResolvedValue([]);
+      mockPrisma.workOrder.count.mockResolvedValue(0);
+
+      const result = await service.findAll({ page: 1, limit: 20 }, familyUser as any);
+
+      expect(mockPrisma.workOrder.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ elderId: { in: [] } }),
+        }),
+      );
+      expect(result.items).toEqual([]);
+    });
+
+    it('should throw ForbiddenException when FAMILY requests an elderId not in their links', async () => {
+      const familyUser = { sub: 'family-1', role: Role.FAMILY, district: undefined };
+      mockPrisma.elderFamilyLink.findMany.mockResolvedValue([{ elderId: 'e-1' }]);
+
+      await expect(
+        service.findAll({ page: 1, limit: 20, elderId: 'e-other' }, familyUser as any),
+      ).rejects.toThrow('无权限查看此老人的工单');
     });
   });
 

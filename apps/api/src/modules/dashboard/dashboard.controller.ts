@@ -4,7 +4,7 @@ import { DashboardService } from './dashboard.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -17,7 +17,7 @@ export class DashboardController {
   @ApiOperation({ summary: '风险概览 — 等级/来源分布 + 趋势' })
   getRiskOverview(
     @Query() query: DashboardQueryDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.dashboardService.getRiskOverview(query, user);
   }
@@ -26,7 +26,7 @@ export class DashboardController {
   @ApiOperation({ summary: '工单效率 — 状态/类型分布 + 平均时长' })
   getWorkOrderEfficiency(
     @Query() query: DashboardQueryDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.dashboardService.getWorkOrderEfficiency(query, user);
   }
@@ -35,7 +35,7 @@ export class DashboardController {
   @ApiOperation({ summary: '老人覆盖 — 片区覆盖率 + 重点关注' })
   getElderCoverage(
     @Query() query: DashboardQueryDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.dashboardService.getElderCoverage(query, user);
   }
@@ -44,7 +44,7 @@ export class DashboardController {
   @ApiOperation({ summary: '网格员效能' })
   getGridWorkerPerformance(
     @Query() query: DashboardQueryDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.dashboardService.getGridWorkerPerformance(query, user);
   }

@@ -3,11 +3,17 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { Role } from '@prisma/client';
 
+/**
+ * JWT 载荷结构，同时也是经 Passport 校验后挂在 request.user 上的对象形状。
+ * role 用 Prisma 的 Role 枚举而非裸 string，让下游 service 的 Requester 类型
+ * 可以直接复用，避免 controller 里 `user: any` 的常见反模式。
+ */
 export interface JwtPayload {
   sub: string;
-  loginType: 'wechat' | 'admin';
-  role: string;
+  loginType: 'wechat' | 'admin' | 'worker';
+  role: Role;
   district?: string;
 }
 

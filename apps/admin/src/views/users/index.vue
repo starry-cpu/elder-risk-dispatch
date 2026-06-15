@@ -132,7 +132,7 @@ function load() {
   usersApi
     .list(filters.role ? { role: filters.role } : {})
     .then((res) => {
-      users.value = res.data.data;
+      users.value = res.data.data.items ?? [];
     })
     .finally(() => {
       loading.value = false;

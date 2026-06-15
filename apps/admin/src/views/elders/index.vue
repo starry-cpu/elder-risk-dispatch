@@ -17,8 +17,9 @@
             class="w-120px"
             @change="load"
           >
+            <el-option label="朝阳" value="朝阳" />
+            <el-option label="海淀" value="海淀" />
             <el-option label="东城" value="东城" />
-            <el-option label="西城" value="西城" />
           </el-select>
           <el-select
             v-model="filters.serviceLevel"

@@ -60,7 +60,7 @@ export class RiskScoringService {
   }
 
   private matchCondition(condition: RuleCondition, input: RiskInput): boolean {
-    const { field, operator, value, requireAlarm, requireChronicDisease } = condition;
+    const { field, operator, value, requireAlarm: _requireAlarm, requireChronicDisease } = condition;
 
     let fieldValue: any;
     switch (field) {

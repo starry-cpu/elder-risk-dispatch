@@ -2,7 +2,7 @@ import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { EvaluationsService } from './evaluations.service';
 import { CreateEvaluationDto } from '../dto/create-evaluation.dto';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 
 @ApiTags('Evaluations')
 @ApiBearerAuth()
@@ -15,14 +15,14 @@ export class EvaluationsController {
   create(
     @Param('id') workOrderId: string,
     @Body() dto: CreateEvaluationDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.evaluationsService.create(workOrderId, dto, user);
   }
 
   @Get('work-orders/:id/evaluation')
   @ApiOperation({ summary: '查看服务评价' })
-  findByWorkOrderId(@Param('id') workOrderId: string, @CurrentUser() user: any) {
+  findByWorkOrderId(@Param('id') workOrderId: string, @CurrentUser() user: AuthenticatedUser) {
     return this.evaluationsService.findByWorkOrderId(workOrderId, user);
   }
 }

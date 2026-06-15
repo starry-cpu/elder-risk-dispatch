@@ -81,11 +81,13 @@ export class VisitsService {
       if (query.to) where.visitTime.lte = new Date(query.to);
     }
 
-    if (requester.role !== Role.ADMIN && requester.district) {
-      where.elder = { district: requester.district };
+    // 非 ADMIN 一律按片区隔离；district 缺失时用 '' 兜底（不会匹配任何老人），
+    // 避免 worker 在 district 为 null 时查到全表（与 work-orders.service / risk.service 一致）
+    if (requester.role !== Role.ADMIN) {
+      where.elder = { district: requester.district ?? '' };
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.visitRecord.findMany({
         where,
         skip,
@@ -97,6 +99,13 @@ export class VisitsService {
       }),
       this.prisma.visitRecord.count({ where }),
     ]);
+
+    // 拍平嵌套关系为扁平字段（前端模板读 elderName/elderId）
+    const items = rows.map((v: any) => ({
+      ...v,
+      elderId: v.elder?.id ?? v.elderId,
+      elderName: v.elder?.name ?? null,
+    }));
 
     return { items, total, page, limit };
   }

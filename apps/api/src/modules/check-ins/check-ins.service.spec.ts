@@ -1,9 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CheckInsService } from './check-ins.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { Role, CheckInMethod } from '@prisma/client';
+import { Role, CheckInMethod, WorkOrderType, RiskLevel, WorkOrderSource } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { RiskService } from '../risk/risk.service';
+import { WorkOrdersService } from '../work-orders/work-orders.service';
+import { DispatchRecommendationService } from '../risk/dispatch-recommendation.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('CheckInsService', () => {
   let service: CheckInsService;
@@ -39,6 +42,17 @@ describe('CheckInsService', () => {
     evaluateAndCreateEvent: jest.fn(),
   };
 
+  const mockWorkOrdersService = {
+    create: jest.fn(),
+    assign: jest.fn(),
+  };
+  const mockDispatchRecommendation = {
+    recommendByType: jest.fn(),
+  };
+  const mockNotificationsService = {
+    sendToRecipients: jest.fn().mockResolvedValue({ recipients: [], notifications: [] }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,10 +60,15 @@ describe('CheckInsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AiService, useValue: mockAiService },
         { provide: RiskService, useValue: mockRiskService },
+        { provide: WorkOrdersService, useValue: mockWorkOrdersService },
+        { provide: DispatchRecommendationService, useValue: mockDispatchRecommendation },
+        { provide: NotificationsService, useValue: mockNotificationsService },
       ],
     }).compile();
     service = module.get<CheckInsService>(CheckInsService);
     jest.clearAllMocks();
+    // 默认重置通知返回
+    mockNotificationsService.sendToRecipients.mockResolvedValue({ recipients: [], notifications: [] });
   });
 
   describe('create', () => {
@@ -306,6 +325,98 @@ describe('CheckInsService', () => {
       mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
       await expect(
         service.findByElder('elder-1', { page: 1, limit: 20 }, otherWorker),
+      ).rejects.toThrow('无权限');
+    });
+  });
+
+  describe('createFamilyRequest (AI 自动派单)', () => {
+    const checkInRow = { id: 'ci-1', elderId: 'elder-1', method: 'TEXT', content: '水管坏了', source: 'FAMILY_REQUEST' };
+    const workOrderRow = { id: 'wo-1', elderId: 'elder-1', type: WorkOrderType.REPAIR, status: 'PENDING' };
+
+    beforeEach(() => {
+      mockPrisma.elder.findUnique.mockResolvedValue(mockElder);
+      mockPrisma.checkIn.create.mockResolvedValue(checkInRow);
+    });
+
+    it('正常路径：AI 高置信度 + 有在岗同片区 worker → 自动建单 + 派单 + 通知', async () => {
+      mockAiService.classify.mockResolvedValue({ type: 'REPAIR', confidence: 0.9, needsHumanReview: false });
+      mockDispatchRecommendation.recommendByType.mockResolvedValue([
+        { userId: 'worker-1', name: '王社工', district: '朝阳区', dutyStatus: 'ON_DUTY', score: 100 },
+      ]);
+      mockWorkOrdersService.create.mockResolvedValue({ workOrder: { ...workOrderRow, status: 'ASSIGNED' }, recommendation: [] });
+      mockWorkOrdersService.assign.mockResolvedValue({ ...workOrderRow, status: 'ASSIGNED', assigneeId: 'worker-1' });
+
+      const result = await service.createFamilyRequest({ elderId: 'elder-1', text: '水管坏了需要人修' }, familyUser);
+
+      // 落 CheckIn（source=FAMILY_REQUEST）
+      expect(mockPrisma.checkIn.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ source: 'FAMILY_REQUEST', requestText: '水管坏了需要人修' }),
+      }));
+      // 建工单（sourceFrom=FAMILY_REQUEST）
+      expect(mockWorkOrdersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceFrom: WorkOrderSource.FAMILY_REQUEST, familyRequestText: '水管坏了需要人修', type: WorkOrderType.REPAIR }),
+        expect.any(Object),
+      );
+      // 自动派单
+      expect(mockWorkOrdersService.assign).toHaveBeenCalledWith('wo-1', 'worker-1', expect.any(Object));
+      // 通知 fan-out
+      expect(mockNotificationsService.sendToRecipients).toHaveBeenCalled();
+      expect(result.dispatched).toBe(true);
+      expect(result.aiClassification?.type).toBe('REPAIR');
+    });
+
+    it('低置信度 → 建工单但不自动派单（转人工）', async () => {
+      mockAiService.classify.mockResolvedValue({ type: 'LIFE', confidence: 0.3, needsHumanReview: true });
+      mockWorkOrdersService.create.mockResolvedValue({ workOrder: workOrderRow, recommendation: [] });
+
+      const result = await service.createFamilyRequest({ elderId: 'elder-1', text: '嗯啊啊' }, familyUser);
+
+      expect(mockWorkOrdersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ level: RiskLevel.LOW }),
+        expect.any(Object),
+      );
+      expect(mockWorkOrdersService.assign).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(false);
+      expect(result.reason).toContain('人工');
+    });
+
+    it('高置信度但无在岗同片区 worker → 转人工（不 assign）', async () => {
+      mockAiService.classify.mockResolvedValue({ type: 'REPAIR', confidence: 0.9, needsHumanReview: false });
+      mockDispatchRecommendation.recommendByType.mockResolvedValue([
+        { userId: 'worker-2', name: '李四', district: '海淀区', dutyStatus: 'ON_DUTY', score: 50 }, // 不同片区
+        { userId: 'worker-1', name: '王社工', district: '朝阳区', dutyStatus: 'OFF_DUTY', score: 60 }, // 不在岗
+      ]);
+      mockWorkOrdersService.create.mockResolvedValue({ workOrder: workOrderRow, recommendation: [] });
+
+      const result = await service.createFamilyRequest({ elderId: 'elder-1', text: '水管坏了' }, familyUser);
+
+      expect(mockWorkOrdersService.assign).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(false);
+      expect(result.reason).toContain('暂无在岗');
+    });
+
+    it('AI 不可用（抛错）→ 兜底建单转人工，不阻塞家属请求', async () => {
+      mockAiService.classify.mockRejectedValue(new Error('DeepSeek down'));
+      mockWorkOrdersService.create.mockResolvedValue({ workOrder: workOrderRow, recommendation: [] });
+
+      const result = await service.createFamilyRequest({ elderId: 'elder-1', text: '水管坏了' }, familyUser);
+
+      expect(mockWorkOrdersService.create).toHaveBeenCalled();
+      expect(mockWorkOrdersService.assign).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(false);
+      expect(result.aiClassification).toBeNull();
+    });
+
+    it('非 FAMILY 角色拒绝', async () => {
+      await expect(
+        service.createFamilyRequest({ elderId: 'elder-1', text: '水管坏了' }, worker),
+      ).rejects.toThrow('仅家属');
+    });
+
+    it('FAMILY 无 family-link 关联拒绝', async () => {
+      const unrelatedFamily = { sub: 'family-stranger', role: Role.FAMILY, district: undefined };
+      await expect(
+        service.createFamilyRequest({ elderId: 'elder-1', text: '水管坏了' }, unrelatedFamily),
       ).rejects.toThrow('无权限');
     });
   });

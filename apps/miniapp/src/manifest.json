@@ -5,8 +5,9 @@
   "versionName": "0.1.0",
   "versionCode": 1,
   "transformPx": false,
+  "uniStatistics": { "enable": false },
   "mp-weixin": {
-    "appid": "",
+    "appid": "wxcbc079a795b22eb8",
     "setting": { "urlCheck": false, "es6": true, "postcss": true, "minified": true },
     "usingComponents": true,
     "optimization": { "subPackages": true }

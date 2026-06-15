@@ -3,9 +3,10 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CheckInsService } from './check-ins.service';
 import { CreateCheckInDto } from './dto/create-check-in.dto';
+import { CreateFamilyRequestDto } from './dto/create-family-request.dto';
 import { QueryCheckInDto } from './dto/query-check-in.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('CheckIns')
 @ApiBearerAuth()
@@ -16,8 +17,15 @@ export class CheckInsController {
   @Post('check-ins')
   @Roles(Role.FAMILY, Role.GRID_WORKER, Role.ADMIN)
   @ApiOperation({ summary: '提交报平安（一键/语音/文本/代填）' })
-  create(@Body() dto: CreateCheckInDto, @CurrentUser() user: any) {
+  create(@Body() dto: CreateCheckInDto, @CurrentUser() user: AuthenticatedUser) {
     return this.checkInsService.create(dto, user);
+  }
+
+  @Post('check-ins/family-request')
+  @Roles(Role.FAMILY)
+  @ApiOperation({ summary: '家属请求帮助（文字描述需求 → AI 分类 → 自动派单）' })
+  createFamilyRequest(@Body() dto: CreateFamilyRequestDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.checkInsService.createFamilyRequest(dto, user);
   }
 
   @Get('elders/:id/check-ins')
@@ -25,7 +33,7 @@ export class CheckInsController {
   findByElder(
     @Param('id') elderId: string,
     @Query() query: QueryCheckInDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.checkInsService.findByElder(elderId, query, user);
   }

@@ -11,7 +11,7 @@
           {{ elder.name }}
         </el-descriptions-item>
         <el-descriptions-item label="性别">
-          {{ elder.gender === 'M' ? '男' : '女' }}
+          {{ genderLabel(elder.gender) }}
         </el-descriptions-item>
         <el-descriptions-item label="出生日期">
           {{
@@ -88,6 +88,7 @@ import { ref, watch } from 'vue';
 import dayjs from 'dayjs';
 import { eldersApi } from '@/api';
 import type { ElderDetail } from '@/api/elders';
+import { genderLabel } from '@/utils/elders';
 
 const props = defineProps<{
   visible: boolean;
@@ -109,8 +110,10 @@ const riskProfile = ref<
   }>
 >([]);
 
+// 显式标注为元组，避免 TS 把源推断成 (boolean | ElderDetail|null)[] 导致解构时
+// elder 被收窄成 boolean（这也是 v-tsc 之前的报错根因）。
 watch(
-  () => [props.visible, props.elder],
+  () => [props.visible, props.elder] as [boolean, ElderDetail | null],
   async ([v, elder]) => {
     if (v && elder) {
       const res = await eldersApi.getRiskProfile(elder.id);

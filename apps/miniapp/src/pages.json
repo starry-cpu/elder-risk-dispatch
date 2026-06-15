@@ -1,12 +1,19 @@
 {
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue"
+    }
+  },
   "pages": [{ "path": "pages/index/index", "style": { "navigationBarTitleText": "照护调度" } }],
   "subPackages": [
     {
       "root": "pagesElder",
       "pages": [
-        { "path": "check-in/index", "style": { "navigationBarTitleText": "一键报平安" } },
+        { "path": "check-in/index", "style": { "navigationBarTitleText": "请求帮助" } },
         { "path": "sos/index", "style": { "navigationBarTitleText": "语音求助" } },
-        { "path": "order-progress/index", "style": { "navigationBarTitleText": "工单进度" } }
+        { "path": "order-progress/index", "style": { "navigationBarTitleText": "工单进度" } },
+        { "path": "bind/index", "style": { "navigationBarTitleText": "账号绑定" } }
       ]
     },
     {
@@ -25,7 +32,8 @@
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "照护调度",
-    "navigationBarBackgroundColor": "#F8F8F8",
-    "backgroundColor": "#F8F8F8"
+    "navigationBarBackgroundColor": "#F7F3ED",
+    "backgroundColor": "#F7F3ED",
+    "navigationStyle": "custom"
   }
 }

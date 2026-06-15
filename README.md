@@ -38,54 +38,71 @@ care-dispatch-system/
 
 - Node.js >= 22
 - pnpm >= 9
-- Docker Desktop
+- Docker Desktop（用于跑 Postgres/Redis/MinIO）
 
-### 1. 安装依赖
+### 一键启动（推荐）
+
+项目自带跨平台一键脚本，覆盖「启基础设施 → 装依赖 → 迁移 → 种子 → 起应用」全流程。
+
+**macOS / Linux / Git Bash：**
+
+```bash
+pnpm install          # 首次：装依赖（脚本也会在缺时自动装）
+pnpm start            # 等同于 ./scripts/dev.sh：起全部
+```
+
+**Windows（cmd / PowerShell）：**
+
+```cmd
+scripts\dev.cmd
+```
+
+启动后访问：
+
+- API: http://localhost:3000/api/v1
+- Swagger: http://localhost:3000/api/docs
+- Admin: http://localhost:5173
+- MinIO Console: http://localhost:9001（minioadmin / minioadmin）
+
+小程序：用「微信开发者工具」打开 `apps/miniapp`，或执行 `./scripts/dev.sh miniapp` / `scripts\dev.cmd miniapp` 编译到 `dist/dev/mp-weixin`。
+
+### 常用命令
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm start` 或 `scripts\dev.cmd` | 一键：起基础设施 + 装依赖 + 迁移 + 种子 + 起 api/admin（后台） |
+| `pnpm start:bootstrap` / `… bootstrap` | 同上但不启动应用（只准备环境） |
+| `pnpm infra:up` / `… up` | 仅起 Postgres + Redis + MinIO |
+| `pnpm infra:down` / `… down` | 停基础设施（保留数据） |
+| `pnpm infra:reset` / `… reset` | 停 + 删数据卷（**不可逆**） |
+| `pnpm db:migrate` / `… db:migrate` | prisma migrate dev |
+| `pnpm db:seed` / `… db:seed` | prisma seed |
+| `pnpm db:reset` / `… db:reset` | prisma migrate reset（**不可逆**） |
+| `pnpm stop` / `… stop` | 停掉后台启动的 api/admin |
+| `./scripts/dev.sh api` / `scripts\dev.cmd api` | 仅前台起 api |
+| `./scripts/dev.sh admin` / `scripts\dev.cmd admin` | 仅前台起 admin |
+| `./scripts/dev.sh logs api` | 跟随后台 api 日志 |
+
+完整命令清单见 `scripts/dev.sh --help`（macOS/Linux）或 `scripts\dev.cmd help`（Windows）。
+
+### 手动逐步启动（等价于一键脚本内部步骤）
 
 ```bash
 pnpm install
-```
-
-### 2. 启动基础设施
-
-```bash
-docker compose -f docker/docker-compose.yml up -d
-```
-
-### 3. 初始化数据库
-
-```bash
+pnpm infra:up
 cp .env.example apps/api/.env
-cd apps/api
-pnpm prisma:migrate
-pnpm prisma:seed
+pnpm db:migrate
+pnpm db:seed
+pnpm dev          # 或 pnpm dev:admin / pnpm dev:miniapp
 ```
 
-### 4. 启动开发服务器
+### 运行测试 / 检查 / 构建
 
 ```bash
-pnpm dev
-```
-
-访问：
-- API: http://localhost:3000/api/v1
-- Swagger: http://localhost:3000/api/docs
-- MinIO Console: http://localhost:9001
-
-### 5. 运行测试
-
-```bash
-# 单元测试
-pnpm test
-
-# E2E 测试
-pnpm test:e2e
-
-# 代码检查
-pnpm lint
-
-# 构建
-pnpm build
+pnpm test         # 单元测试（api 集成测试需 Docker，CI 上自动跑）
+pnpm test:e2e     # E2E 测试
+pnpm lint         # 代码检查
+pnpm build        # 构建
 ```
 
 ## 开发规范

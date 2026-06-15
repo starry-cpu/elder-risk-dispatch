@@ -1,21 +1,47 @@
 import { ref } from 'vue';
 
+// 工厂函数：惰性获取 RecorderManager，便于测试 mock
+function getRecorder() {
+  return uni.getRecorderManager();
+}
+
 export function useSosVoice() {
   const isRecording = ref(false);
-  const voiceUrl = ref('');
   const duration = ref(0);
   const maxDuration = 60;
+  // uploading 由调用方（页面）在上传期间切换，composable 只负责暴露该状态位
+  const uploading = ref(false);
+  const recordedFilePath = ref('');
 
+  const recorder = getRecorder();
   let timer: ReturnType<typeof setInterval> | null = null;
+  let stopping = false;
 
-  function startRecording() {
-    // Clear any existing timer to prevent duplicate interval leaks
+  recorder.onStart(() => {
+    isRecording.value = true;
+    duration.value = 0;
+    stopping = false;
+  });
+
+  recorder.onStop((res: { tempFilePath: string; duration: number }) => {
+    isRecording.value = false;
+    recordedFilePath.value = res.tempFilePath;
+    stopping = false;
     if (timer) {
       clearInterval(timer);
       timer = null;
     }
-    isRecording.value = true;
-    duration.value = 0;
+  });
+
+  function startRecording() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    recordedFilePath.value = '';
+    // format 选 mp3：满足后端 check-ins 的 .mp3 校验
+    recorder.start({ format: 'mp3', duration: 60000, sampleRate: 16000, numberOfChannels: 1 });
+    // duration 计时用 setInterval（recorder 自身到 onStop 才给真实时长）
     timer = setInterval(() => {
       duration.value++;
       if (duration.value >= maxDuration) {
@@ -25,35 +51,45 @@ export function useSosVoice() {
   }
 
   function stopRecording() {
-    isRecording.value = false;
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
-    }
-  }
-
-  function setVoiceUrl(url: string) {
-    voiceUrl.value = url;
+    // 幂等守卫：避免 onStop 未触发时 setInterval 反复调用 recorder.stop 造成空转
+    if (stopping) return;
+    stopping = true;
+    recorder.stop(); // 实际停止 + 触发 onStop 回调
   }
 
   function clear() {
-    voiceUrl.value = '';
+    recordedFilePath.value = '';
     duration.value = 0;
     isRecording.value = false;
+    stopping = false;
     if (timer) {
       clearInterval(timer);
       timer = null;
     }
+  }
+
+  /**
+   * 页面离开（onHide / onUnload）时彻底释放录音资源：
+   * - clear() 只清状态与计时器，不会真正停掉正在进行的录音会话；
+   * - 这里补一次幂等的 recorder.stop()，避免麦克风指示灯长亮、录音会话占用
+   *   导致下次录音失败（RecorderManager 为全局单例，监听器随页面长存）。
+   */
+  function dispose() {
+    if (isRecording.value) {
+      stopRecording();
+    }
+    clear();
   }
 
   return {
     isRecording,
-    voiceUrl,
     duration,
     maxDuration,
+    uploading,
+    recordedFilePath,
     startRecording,
     stopRecording,
-    setVoiceUrl,
     clear,
+    dispose,
   };
 }

@@ -3,7 +3,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { DispatchRecommendationService } from '../risk/dispatch-recommendation.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkOrderStateMachine } from './work-orders.state-machine';
-import { WorkOrderType, WorkOrderStatus, RiskStatus, Role, RiskLevel } from '@prisma/client';
+import { WorkOrderType, WorkOrderStatus, RiskStatus, Role, RiskLevel, WorkOrderSource } from '@prisma/client';
 
 export interface Requester {
   sub: string;
@@ -77,6 +77,10 @@ export class WorkOrdersService {
       level?: RiskLevel;
       deadline?: string;
       dispatchReason?: string;
+      /** 工单来源（默认 MANUAL）；家属请求自动派单时传 FAMILY_REQUEST */
+      sourceFrom?: WorkOrderSource;
+      /** 家属请求原文（来源为 FAMILY_REQUEST/SOS 时写入，展示给 worker）*/
+      familyRequestText?: string;
     },
     requester: Requester,
   ) {
@@ -122,6 +126,8 @@ export class WorkOrdersService {
         deadline: input.deadline ? new Date(input.deadline) : null,
         dispatchReason: input.dispatchReason ?? null,
         createdById: requester.sub,
+        sourceFrom: input.sourceFrom ?? WorkOrderSource.MANUAL,
+        familyRequestText: input.familyRequestText ?? null,
       },
     });
 
@@ -178,14 +184,26 @@ export class WorkOrdersService {
     if (elderId) where.elderId = elderId;
     if (assigneeId) where.assigneeId = assigneeId;
 
-    // District isolation
-    if (requester.role !== Role.ADMIN) {
+    // 按角色隔离：FAMILY 只看关联老人的工单，worker 保持 district 隔离
+    if (requester.role === Role.FAMILY) {
+      const links = await this.prisma.elderFamilyLink.findMany({
+        where: { userId: requester.sub },
+        select: { elderId: true },
+      });
+      const elderIds = links.map((l: any) => l.elderId);
+      // 越权防护：若传了 elderId 但不在自己的关联列表内，拒绝
+      if (elderId && !elderIds.includes(elderId)) {
+        throw new ForbiddenException('无权限查看此老人的工单');
+      }
+      where.elderId = { in: elderIds };
+    } else if (requester.role !== Role.ADMIN) {
+      // worker 保持原有 district 隔离
       where.elder = { district: requester.district ?? '' };
     } else if (district) {
       where.elder = { district };
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.workOrder.findMany({
         where,
         include: {
@@ -198,6 +216,16 @@ export class WorkOrdersService {
       }),
       this.prisma.workOrder.count({ where }),
     ]);
+
+    // 拍平嵌套关系为扁平字段（前端模板读 elderName/assigneeName/elderId），
+    // 因为 ResponseInterceptor 只包 {code,data,message}，不做关系拍平。
+    const items = rows.map((wo: any) => ({
+      ...wo,
+      elderId: wo.elder?.id ?? wo.elderId,
+      elderName: wo.elder?.name ?? null,
+      assigneeId: wo.assignee?.id ?? wo.assigneeId ?? null,
+      assigneeName: wo.assignee?.name ?? null,
+    }));
 
     return { items, total, page, limit };
   }
@@ -428,6 +456,11 @@ export class WorkOrdersService {
       orderBy: { createdAt: 'asc' },
     });
   }
+  /**
+   * 超时自动升级工单 level（LOW→MEDIUM→HIGH）。
+   * 仅由 SchedulerService.escalateTimeouts 在"已派单/处理中且超时"场景调用——
+   * 调用方负责用 status 过滤确保不升级 PENDING/终态工单。
+   */
   async escalate(id: string) {
     const wo = await this.prisma.workOrder.findUnique({
       where: { id },

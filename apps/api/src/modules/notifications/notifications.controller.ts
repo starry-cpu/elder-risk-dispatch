@@ -6,7 +6,7 @@ import { NotificationQueryDto } from './dto/notification-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 
 @ApiTags('Notifications')
@@ -29,20 +29,23 @@ export class NotificationsController {
 
   @Get()
   @Roles(Role.ADMIN, Role.GRID_WORKER)
-  async findAll(@Query() query: NotificationQueryDto) {
-    return this.notificationsService.findAll({
-      targetType: query.targetType,
-      targetId: query.targetId,
-      page: query.page ?? 1,
-      limit: query.limit ?? 20,
-    });
+  async findAll(@Query() query: NotificationQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.findAll(
+      {
+        targetType: query.targetType,
+        targetId: query.targetId,
+        page: query.page ?? 1,
+        limit: query.limit ?? 20,
+      },
+      user,
+    );
   }
 
   @Get('inbox')
   @ApiOperation({ summary: '当前用户通知列表' })
   async getInbox(
     @Query() query: NotificationQueryDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.notificationsService.getInbox({
       userId: user.sub,
@@ -56,7 +59,7 @@ export class NotificationsController {
   @ApiOperation({ summary: '标记通知已读' })
   async markAsRead(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     await this.notificationsService.markAsRead(id, user.sub);
     return { success: true };
@@ -64,7 +67,7 @@ export class NotificationsController {
 
   @Get('unread-count')
   @ApiOperation({ summary: '未读通知计数' })
-  async getUnreadCount(@CurrentUser() user: any) {
+  async getUnreadCount(@CurrentUser() user: AuthenticatedUser) {
     const count = await this.notificationsService.getUnreadCount(user.sub);
     return { count };
   }

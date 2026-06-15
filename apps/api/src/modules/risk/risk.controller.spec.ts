@@ -9,6 +9,7 @@ describe('RiskController', () => {
 
   const mockRiskService = {
     evaluateAndCreateEvent: jest.fn(),
+    assertCanEvaluate: jest.fn().mockResolvedValue(undefined),
     findAll: jest.fn(),
     findById: jest.fn(),
     reviewEvent: jest.fn(),
@@ -24,7 +25,7 @@ describe('RiskController', () => {
   });
 
   describe('evaluate', () => {
-    it('应调用 service.evaluateAndCreateEvent 并返回结果', async () => {
+    it('应先鉴权再调用 service.evaluateAndCreateEvent 并返回结果', async () => {
       const dto = {
         elderId: 'elder-1',
         hoursSinceLastCheckIn: 25,
@@ -32,12 +33,15 @@ describe('RiskController', () => {
         abnormalText: false,
         age: 75, hasChronicDisease: false, recentHighRisk: false,
       };
+      const admin = { sub: 'admin-1', role: Role.ADMIN, district: '朝阳区', loginType: 'admin' as const };
       mockRiskService.evaluateAndCreateEvent.mockResolvedValue({
         id: 're-1', score: 40, level: RiskLevel.MEDIUM, status: RiskStatus.PENDING_REVIEW,
       });
 
-      const result = await controller.evaluate(dto);
+      const result = await controller.evaluate(dto, admin);
       expect(result).toBeDefined();
+      // 鉴权先于评估
+      expect(mockRiskService.assertCanEvaluate).toHaveBeenCalledWith('elder-1', admin);
       expect(mockRiskService.evaluateAndCreateEvent).toHaveBeenCalledWith(dto);
     });
   });
@@ -45,7 +49,7 @@ describe('RiskController', () => {
   describe('findAll', () => {
     it('应返回分页列表', async () => {
       mockRiskService.findAll.mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 });
-      const result = await controller.findAll({ page: 1, limit: 20 }, { sub: 'u1', role: Role.ADMIN });
+      const result = await controller.findAll({ page: 1, limit: 20 }, { sub: 'u1', role: Role.ADMIN, loginType: 'admin' });
       expect(result.total).toBe(0);
     });
   });
@@ -53,7 +57,7 @@ describe('RiskController', () => {
   describe('review', () => {
     it('应调用 service.reviewEvent', async () => {
       mockRiskService.reviewEvent.mockResolvedValue({ id: 're-1', status: RiskStatus.CONFIRMED });
-      const result = await controller.review('re-1', { status: RiskStatus.CONFIRMED, note: '已确认' }, { sub: 'u1' });
+      const result = await controller.review('re-1', { status: RiskStatus.CONFIRMED, note: '已确认' }, { sub: 'u1', role: Role.ADMIN, loginType: 'admin' });
       expect(result.status).toBe(RiskStatus.CONFIRMED);
     });
   });
